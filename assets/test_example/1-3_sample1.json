@@ -1,0 +1,8 @@
+{
+  "prompt": "Place the young woman from <image 1> into the outdoor scene from <image 2>. She is standing on the walkway, with the modern shade structure and greenery from <image 2> visible in the background. Ensure the lighting on the woman matches the sunny, daytime atmosphere of the park environment.",
+  "input_images": [
+    "1-3_sample1_input1.jpg",
+    "1-3_sample1_input2.jpg"
+  ],
+  "output_image": "1-3_sample1_output.jpg"
+}

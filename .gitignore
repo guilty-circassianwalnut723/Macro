@@ -1,0 +1,98 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter Notebooks
+.ipynb_checkpoints/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# Model outputs
+outputs/
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+
+# Logs and temp files
+*.log
+*.tmp
+/tmp/
+
+# Data directories (large data files should not be committed)
+data/raw/
+data/source/
+data/final/
+data/filter/
+data/split/
+data/wrong_score/
+
+# API keys and secrets (never commit these)
+.env
+.env.local
+secrets.yaml
+secrets.json
+api_keys.txt
+config_private.yaml
+
+# Flask temp files
+instance/
+
+# Distribution / packaging
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+
+# Type annotations
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pytest
+.pytest_cache/
+
+# Coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Offload folders
+offload/
+
+# HuggingFace cache
+.cache/
+huggingface_cache/
+
+temp/
+ckpts/
+data/filter
+data/final
+data/raw
+exps/

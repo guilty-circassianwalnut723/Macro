@@ -1,0 +1,10 @@
+{
+  "prompt": "Create an image of the young woman from <image 1> standing next to the middle-aged woman from <image 2>. The woman from <image 1> is wearing the jacket from <image 4>. The woman from <image 2> is wearing the sweater from <image 3>.",
+  "input_images": [
+    "4-5_sample2_input1.jpg",
+    "4-5_sample2_input2.jpg",
+    "4-5_sample2_input3.jpg",
+    "4-5_sample2_input4.jpg"
+  ],
+  "output_image": "4-5_sample2_output.jpg"
+}

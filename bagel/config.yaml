@@ -1,0 +1,56 @@
+# Bagel Experiment Configuration File
+# All experiment configurations in YAML format.
+#
+# Usage:
+#   python process_config.py --list
+#   python process_config.py --exp_name my_exp
+#   python process_config.py --all
+
+# Global configuration
+global:
+  # Path to T2I pretraining data (JSONL format)
+  # Use example data for open source release
+  t2i_data_path: data/raw/t2i_example/t2i_example.jsonl
+  # Default T2I data sampling ratio (0.0–1.0)
+  default_t2i_ratio: 0.2
+  # Root directory of MultiRef filter data: {multiref_data_root}/{task}/train/{category}/*.json
+  multiref_data_root: data/filter
+  # Maximum number of reference images
+  default_max_ref_images: 10
+  # Per-image pixel limits (adjusts dynamically based on image count)
+  default_max_input_pixels: [1048576, 1048576, 589824, 589824, 589824, 262144, 262144, 262144, 262144, 262144]
+  # Output image pixel limit
+  default_max_output_pixels: 589824
+  # VAE and ViT size limits
+  default_vae_size: [1024, 512]
+  default_vit_size: [336, 224]
+  # Default training parameters
+  default_num_epochs: 10
+  default_learning_rate: 2e-5
+  default_num_workers: 4
+
+# Data config templates
+data_config_templates:
+  debug_config: &debug_config
+    "1-3":
+      data_num: 1000
+    "4-5":
+      data_num: 1000
+
+# Active experiments
+experiments:
+  # Example: train on all four tasks with T2I data
+  example_with_t2i:
+    use_t2i: true
+    t2i_ratio: 0.1
+    data_config:
+      customization: *debug_config
+      spatial: *debug_config
+      illustration: *debug_config
+      temporal: *debug_config
+
+  # Example: customization only, no T2I
+  customization_only:
+    use_t2i: false
+    data_config:
+      customization: *debug_config

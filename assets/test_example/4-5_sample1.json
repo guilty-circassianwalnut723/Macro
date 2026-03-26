@@ -1,0 +1,10 @@
+{
+  "prompt": "Generate an image of an indoor room featuring the woman from <image 2> wearing the dress from <image 3>. She is standing next to the man from <image 4>. The coat rack from <image 1> is placed in the background of the scene.",
+  "input_images": [
+    "4-5_sample1_input1.jpg",
+    "4-5_sample1_input2.jpg",
+    "4-5_sample1_input3.jpg",
+    "4-5_sample1_input4.jpg"
+  ],
+  "output_image": "4-5_sample1_output.jpg"
+}
