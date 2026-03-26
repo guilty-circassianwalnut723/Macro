@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <a href="https://huggingface.co/Azily"><img src="https://img.shields.io/badge/🤗%20HuggingFace-Azily-yellow"></a>
+  <a href="https://huggingface.co/datasets/Azily/Macro-Dataset"><img src="https://img.shields.io/badge/🤗%20Macro--Dataset-yellow"></a>
   &nbsp;
   <a href="https://arxiv.org/abs/XXXX.XXXXX"><img src="https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg"></a>
 </p>
@@ -253,48 +253,116 @@ Scores are saved as JSON files alongside the generated images in `outputs/<model
 
 ### 2.1 Download
 
-The Macro dataset is available on Hugging Face:
+The Macro dataset is available on Hugging Face as a collection of `.tar.gz` archives:
 
 [![🤗](https://img.shields.io/badge/🤗-Azily/Macro--Dataset-yellow)](https://huggingface.co/datasets/Azily/Macro-Dataset)
 
+#### Step 1 — Download the archives
+
 ```bash
-huggingface-cli download Azily/Macro-Dataset --repo-type dataset --local-dir data/
+# Download all archives into data_tar/
+huggingface-cli download Azily/Macro-Dataset --repo-type dataset --local-dir data_tar/
+```
+
+> **Selective download:** If you only need the evaluation benchmark (JSON index files, no images), download just `filter.tar.gz` (~510 MB):
+> ```bash
+> huggingface-cli download Azily/Macro-Dataset \
+>     --repo-type dataset \
+>     --include "filter.tar.gz" \
+>     --local-dir data_tar/
+> ```
+>
+> To download a specific task/split/category (e.g., customization train 1–3 images):
+> ```bash
+> huggingface-cli download Azily/Macro-Dataset \
+>     --repo-type dataset \
+>     --include "final_customization_train_1-3.tar.gz" \
+>     --local-dir data_tar/
+> ```
+
+#### Step 2 — Extract
+
+An extraction script `extract_data.sh` is included in the downloaded `data_tar/` folder. Run it from the project root to restore the original `data/` tree:
+
+```bash
+bash data_tar/extract_data.sh ./data_tar .
+# Restores: ./data/filter/, ./data/final/, ./data/raw/
+```
+
+Or extract all archives manually:
+
+```bash
+for f in data_tar/*.tar.gz; do tar -xzf "$f" -C .; done
 ```
 
 ### 2.2 Structure
 
+After extraction, the `data/` directory has the following layout:
+
 ```
 data/
-├── raw/
-│   └── t2i_example/
-│       └── t2i_example.jsonl     # example T2I prompts (for training)
-└── filter/                       # filtered data for training & evaluation
-    ├── customization/
-    │   ├── train/
-    │   │   ├── 1-3/  *.json      # training samples with 1–3 reference images
-    │   │   ├── 4-5/  *.json
-    │   │   ├── 6-7/  *.json
-    │   │   └── >=8/  *.json
-    │   └── eval/
-    │       ├── 1-3/  *.json      # evaluation samples
-    │       ├── 4-5/  *.json
-    │       ├── 6-7/  *.json
-    │       └── >=8/  *.json
-    ├── illustration/  (same layout)
-    ├── spatial/       (same layout)
-    └── temporal/      (same layout)
+├── filter/                          # JSON index files for training & evaluation
+│   ├── customization/
+│   │   ├── train/
+│   │   │   ├── 1-3/  *.json        # 20,000 training samples (1–3 ref images)
+│   │   │   ├── 4-5/  *.json        # 20,000 training samples
+│   │   │   ├── 6-7/  *.json        # 30,000 training samples
+│   │   │   └── >=8/  *.json        # 30,000 training samples
+│   │   └── eval/
+│   │       ├── 1-3/  *.json        # 250 evaluation samples
+│   │       ├── 4-5/  *.json        # 250 evaluation samples
+│   │       ├── 6-7/  *.json        # 250 evaluation samples
+│   │       └── >=8/  *.json        # 250 evaluation samples
+│   ├── illustration/  (same layout; 25,000 train / 250 eval per category)
+│   ├── spatial/       (same layout)
+│   └── temporal/      (same layout)
+├── final/                           # Actual image data, referenced by filter/ JSONs
+│   ├── customization/
+│   │   ├── train/
+│   │   │   ├── 1-3/
+│   │   │   │   ├── data/
+│   │   │   │   │   ├── 00000000/
+│   │   │   │   │   │   ├── image_1.jpg
+│   │   │   │   │   │   ├── image_2.jpg   (etc.)
+│   │   │   │   │   │   └── image_output.jpg
+│   │   │   │   │   └── ...
+│   │   │   │   └── json/  *.json   (raw generation metadata)
+│   │   │   ├── 4-5/ ...
+│   │   │   ├── 6-7/ ...
+│   │   │   └── >=8/ ...
+│   │   └── eval/ ...
+│   ├── illustration/ ...
+│   ├── spatial/ ...
+│   └── temporal/ ...
+└── raw/
+    ├── t2i_example/
+    │   ├── t2i_example.jsonl        # Placeholder T2I prompts (training format reference)
+    │   └── images/                  # Placeholder images
+    └── customization/               # Original source images used in data construction
+        ├── cloth/  *.jpg
+        ├── human/  *.jpg
+        ├── object/ *.jpg
+        ├── scene/  *.jpg
+        ├── style/  *.jpg
+        └── *_train.jsonl / *_eval.jsonl
 ```
 
-Each JSON file contains:
+Each JSON file in `data/filter/` contains:
 
 ```json
 {
-  "idx": 0,
-  "prompt": "Generate an image of …",
-  "input_images": ["ref1.jpg", "ref2.jpg"],
-  "output_image": "target.jpg"
+  "task": "customization",
+  "idx": 1,
+  "prompt": "Create an image of the modern glass and metal interior from <image 2>, applying the classical oil painting style from <image 1> globally across the entire scene.",
+  "input_images": [
+    "data/final/customization/train/1-3/data/00022018/image_1.jpg",
+    "data/final/customization/train/1-3/data/00022018/image_2.jpg"
+  ],
+  "output_image": "data/final/customization/train/1-3/data/00022018/image_output.jpg"
 }
 ```
+
+> **Note:** All `input_images` and `output_image` paths are relative to the parent directory of `data/` (i.e., the project root). Place the extracted `data/` folder at the project root before running training or inference.
 
 ### 2.3 Data Construction Pipeline (Reference Only)
 
