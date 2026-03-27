@@ -1,38 +1,38 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>数据可视化 - Multi-Reference Data</title>
+    <title>Data Visualization - Multi-Reference Data</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="container">
-        <!-- 头部标题 -->
+        <!-- Header title -->
         <header class="header">
-            <h1>数据可视化 - Multi-Reference Data</h1>
+            <h1>Data Visualization - Multi-Reference Data</h1>
         </header>
 
-        <!-- 筛选器区域 -->
+        <!-- Filter area -->
         <div class="filters">
             <div class="filter-group">
-                <label for="task-select">Task类别:</label>
+                <label for="task-select">Task Category:</label>
                 <select id="task-select">
-                    <option value="">请选择...</option>
+                    <option value="">Please select...</option>
                 </select>
             </div>
 
             <div class="filter-group" id="spatial-sub-type-group" style="display: none;">
-                <label for="sub-type-select">Spatial子类型:</label>
+                <label for="sub-type-select">Spatial Subtype:</label>
                 <select id="sub-type-select">
-                    <option value="">请选择...</option>
+                    <option value="">Please select...</option>
                 </select>
             </div>
 
             <div class="filter-group">
                 <label for="split-type-select">Train/Eval:</label>
                 <select id="split-type-select">
-                    <option value="">请选择...</option>
+                    <option value="">Please select...</option>
                     <option value="train">Train</option>
                     <option value="eval">Eval</option>
                 </select>
@@ -41,68 +41,68 @@
             <div class="filter-group">
                 <label for="image-count-select">Image Num Category:</label>
                 <select id="image-count-select">
-                    <option value="">请选择...</option>
+                    <option value="">Please select...</option>
                 </select>
             </div>
 
             <div class="filter-group">
-                <label for="filter-select">筛选类型:</label>
+                <label for="filter-select">Filter Type:</label>
                 <select id="filter-select">
-                    <option value="all">全部 (All)</option>
-                    <option value="pass">通过 (Pass)</option>
-                    <option value="fail">未通过 (Fail)</option>
+                    <option value="all">All</option>
+                    <option value="pass">Pass</option>
+                    <option value="fail">Fail</option>
                 </select>
             </div>
         </div>
 
-        <!-- 当前选择显示 -->
+        <!-- Current selection display -->
         <div class="current-selection">
             <div class="selection-item">
-                <span class="label">当前Task:</span>
+                <span class="label">Current Task:</span>
                 <span id="current-task" class="value">-</span>
             </div>
             <div class="selection-item">
-                <span class="label">当前子类型:</span>
+                <span class="label">Current Subtype:</span>
                 <span id="current-sub-type" class="value">-</span>
             </div>
             <div class="selection-item">
-                <span class="label">当前Split:</span>
+                <span class="label">Current Split:</span>
                 <span id="current-split-type" class="value">-</span>
             </div>
             <div class="selection-item">
-                <span class="label">当前Image Num:</span>
+                <span class="label">Current Image Num:</span>
                 <span id="current-image-count" class="value">-</span>
             </div>
             <div class="selection-item">
-                <span class="label">总样本数:</span>
+                <span class="label">Total Samples:</span>
                 <span id="total-samples" class="value">0</span>
             </div>
             <div class="selection-item">
-                <span class="label">筛选类型:</span>
-                <span id="current-filter" class="value">全部</span>
+                <span class="label">Filter Type:</span>
+                <span id="current-filter" class="value">All</span>
             </div>
         </div>
 
-        <!-- 加载提示 -->
+        <!-- Loading indicator -->
         <div id="loading" class="loading" style="display: none;">
             <div class="spinner"></div>
-            <span>加载中...</span>
+            <span>Loading...</span>
         </div>
 
-        <!-- 错误提示 -->
+        <!-- Error message -->
         <div id="error-message" class="error-message" style="display: none;"></div>
 
-        <!-- 样本展示区域 -->
+        <!-- Sample display area -->
         <div id="samples-container" class="samples-container"></div>
 
-        <!-- 浮动按钮组 -->
+        <!-- Floating button group -->
         <div class="floating-buttons">
             <div class="floating-pagination">
-                <button id="prev-page" class="page-btn" disabled>上一页</button>
-                <span id="page-info" class="page-info">第 0 / 0 页</span>
-                <button id="next-page" class="page-btn" disabled>下一页</button>
+                <button id="prev-page" class="page-btn" disabled>Prev</button>
+                <span id="page-info" class="page-info">Page 0 / 0</span>
+                <button id="next-page" class="page-btn" disabled>Next</button>
             </div>
-            <button id="back-to-top" class="back-to-top-btn" title="返回顶部">
+            <button id="back-to-top" class="back-to-top-btn" title="Back to top">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M18 15l-6-6-6 6"/>
                 </svg>

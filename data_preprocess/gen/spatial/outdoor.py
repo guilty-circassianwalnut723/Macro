@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Spatial Outdoor数据生成脚本
+Spatial Outdoor data generation script
 
-功能：
-1. 从split/spatial目录读取train/eval数据（outdoor子类型）
-2. 从室外全景图中采样多视角数据
-3. 使用equilib库进行视角转换
-4. 保存到final/spatial/{train/eval}/{image_count_category}/data和json目录
-5. 支持唯一识别编号，避免重复生成
+Features:
+1. Read train/eval data from split/spatial directory (outdoor subtype)
+2. Sample multi-viewpoint data from outdoor panoramic images
+3. Use the equilib library for viewpoint transformation
+4. Save to final/spatial/{train/eval}/{image_count_category}/data and json directories
+5. Support unique IDs to avoid duplicate generation
 """
 
 import json
@@ -23,9 +23,9 @@ from PIL import Image
 try:
     from equilib import equi2pers
 except ImportError:
-    raise ImportError("需要安装 equilib 库: pip install equilib")
+    raise ImportError("The equilib library is required: pip install equilib")
 
-# 添加utils路径
+# Add utils path
 CURRENT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(CURRENT_DIR))
 
@@ -36,11 +36,11 @@ from utils.common import (
     generate_unique_id
 )
 
-# ====== 配置参数 ======
+# ====== Configuration parameters ======
 SPLIT_DIR = (Path(__file__).resolve().parent.parent.parent.parent / "data" / "split" / "spatial")
 FINAL_DIR = (Path(__file__).resolve().parent.parent.parent.parent / "data" / "final" / "spatial")
 
-# 生成配置：{image_count_category: {train: count, eval: count}}
+# Generation config: {image_count_category: {train: count, eval: count}}
 GEN_CONFIG = {
     "1-3": {"train": 10000, "eval": 0},
     "4-5": {"train": 0, "eval": 0},
@@ -48,7 +48,7 @@ GEN_CONFIG = {
     ">=8": {"train": 0, "eval": 0},
 }
 
-# 视角方向定义（相对于正面的角度，单位：度）
+# Viewpoint direction definitions (angle relative to front, in degrees)
 VIEW_DIRECTIONS = {
     'front': 0,
     'front_left': 45,
@@ -62,7 +62,7 @@ VIEW_DIRECTIONS = {
     'bottom': None,
 }
 
-# 视角名称映射（用于生成prompt）
+# Viewpoint name mapping (for prompt generation)
 VIEW_NAMES = {
     'front': 'front',
     'front_left': 'front-left',
@@ -76,18 +76,18 @@ VIEW_NAMES = {
     'bottom': 'bottom',
 }
 
-# 随机种子
+# Random seed
 RANDOM_SEED = 42
 # ======================
 
 
 def degrees_to_radians(degrees: float) -> float:
-    """将角度转换为弧度"""
+    """Convert degrees to radians"""
     return degrees * math.pi / 180.0
 
 
 def radians_to_degrees(radians: float) -> float:
-    """将弧度转换为角度"""
+    """Convert radians to degrees"""
     return radians * 180.0 / math.pi
 
 
@@ -99,7 +99,7 @@ def calculate_overlap_ratio_2d(
     fov1: float,
     fov2: float
 ) -> float:
-    """计算两个视角之间的面积重叠比例"""
+    """Calculate the area overlap ratio between two viewpoints"""
     delta_yaw = abs(view1_yaw - view2_yaw)
     if delta_yaw > math.pi:
         delta_yaw = 2 * math.pi - delta_yaw
@@ -144,7 +144,7 @@ def get_view_angles(
     base_pitch: float = 0.0,
     noise: float = 0.0
 ) -> Dict[str, float]:
-    """获取指定方向的视角角度"""
+    """Get the viewpoint angles for the specified direction"""
     if direction == 'top':
         yaw = base_yaw + (random.uniform(-noise, noise) if noise > 0 else 0)
         return {
@@ -177,7 +177,7 @@ def extract_perspective_view(
     width: int = 512,
     fov: float = 90.0
 ) -> np.ndarray:
-    """从全景图中提取透视视角"""
+    """Extract a perspective view from an equirectangular image"""
     if len(equi_img.shape) == 3:
         if equi_img.shape[2] == 3 or equi_img.shape[2] == 1:
             equi_img = np.transpose(equi_img, (2, 0, 1))
@@ -210,12 +210,12 @@ def find_valid_view_combination(
     noise: float,
     max_attempts: int = 200
 ) -> Optional[Tuple[List[str], Dict[str, Dict[str, float]], Dict[str, float]]]:
-    """找到一个有效的视角组合"""
+    """Find a valid viewpoint combination"""
     available_views = [v for v in VIEW_DIRECTIONS.keys() if v != output_view]
     num_input = num_views - 1
     
     if num_input > len(available_views):
-        raise ValueError(f"请求的输入视角数 ({num_input}) 超过了可用视角数 ({len(available_views)})")
+        raise ValueError(f"Requested input view count ({num_input}) exceeds available view count ({len(available_views)})")
     
     for attempt in range(max_attempts):
         input_views = random.sample(available_views, num_input)
@@ -261,20 +261,20 @@ def find_valid_view_combination(
 
 def load_split_data(split_dir: Path, split_type: str, sub_type: str) -> List[Dict]:
     """
-    从split目录加载数据
+    Load data from split directory
     
     Args:
-        split_dir: split目录
-        split_type: "train" 或 "eval"
-        sub_type: 子类型（"outdoor"）
+        split_dir: split directory
+        split_type: "train" or "eval"
+        sub_type: subtype ("outdoor")
     
     Returns:
-        样本列表
+        list of samples
     """
     json_file = split_dir / f"{sub_type}_{split_type}.json"
     
     if not json_file.exists():
-        # 兼容旧格式：尝试读取txt文件
+        # Compatibility with old format: try to read txt file
         txt_file = split_dir / f"{sub_type}_{split_type}.txt"
         if txt_file.exists():
             samples = []
@@ -302,20 +302,20 @@ def sample_one(
     sampling_config: Optional[Dict] = None
 ) -> Optional[Dict]:
     """
-    从一个全景图采样一个样本
+    Sample one sample from a panoramic image
     
     Args:
-        equi_path: 全景图路径
-        num_input_views: 输入视角数量
-        sampling_config: 采样配置字典
+        equi_path: panoramic image path
+        num_input_views: number of input viewpoints
+        sampling_config: sampling config dict
     
     Returns:
-        样本数据或None
+        sample data or None
     """
     if not equi_path.exists():
         return None
     
-    # 加载全景图
+    # Load panoramic image
     try:
         equi_img = Image.open(equi_path)
         equi_img = np.asarray(equi_img)
@@ -325,7 +325,7 @@ def sample_one(
         elif equi_img.shape[2] == 4:
             equi_img = equi_img[:, :, :3]
         
-        # 将图像resize到短边为2048
+        # Resize image so the shorter side is 2048
         height, width = equi_img.shape[:2]
         min_dim = min(height, width)
         if min_dim > 2048:
@@ -336,10 +336,10 @@ def sample_one(
             equi_img_pil = equi_img_pil.resize((new_width, new_height), Image.LANCZOS)
             equi_img = np.asarray(equi_img_pil)
     except Exception as e:
-        print(f"加载全景图失败 {equi_path}: {e}")
+        print(f"Failed to load panoramic image {equi_path}: {e}")
         return None
     
-    # 获取配置参数
+    # Get configuration parameters
     if sampling_config is None:
         sampling_config = {}
     base_pitch_range = sampling_config.get("base_pitch_range", [-10, 10])
@@ -353,10 +353,10 @@ def sample_one(
     
     noise = degrees_to_radians(noise_scale) if add_noise else 0.0
     
-    # 总视角数（输入视角数 + 1个输出视角）
+    # Total viewpoint count (input viewpoints + 1 output viewpoint)
     num_views = num_input_views + 1
     
-    # 尝试找到有效的视角组合
+    # Try to find a valid viewpoint combination
     max_tries = 5
     result = None
     final_base_yaw = None
@@ -365,7 +365,7 @@ def sample_one(
     final_view_fovs = None
     
     for try_idx in range(max_tries):
-        # 每次循环都重新生成 base_yaw 和 base_pitch，增加找到有效组合的概率
+        # Re-generate base_yaw and base_pitch each iteration to increase the chance of finding a valid combination
         base_yaw = random.uniform(0, 2 * math.pi)
         base_pitch = degrees_to_radians(random.uniform(base_pitch_range[0], base_pitch_range[1]))
         
@@ -395,7 +395,7 @@ def sample_one(
     if result is None:
         return None
     
-    # 提取视角图像
+    # Extract viewpoint images
     input_images = []
     input_view_names = []
     height, width = image_size
@@ -409,7 +409,7 @@ def sample_one(
         input_images.append(pers_img)
         input_view_names.append(VIEW_NAMES[view])
     
-    # 提取输出视角
+    # Extract output viewpoint
     output_rots = view_angles[final_output_view]
     output_fov = final_view_fovs[final_output_view]
     output_image = extract_perspective_view(
@@ -429,9 +429,9 @@ def sample_one(
 
 
 def generate_prompt(input_views: List[str], output_view: str) -> str:
-    """生成描述输入和输出视角的prompt"""
-    # 注意：input_views 和 output_view 已经是转换后的显示名称（如 'back-left'），
-    # 不是原始的 view 键（如 'back_left'），所以直接使用即可
+    """Generate a prompt describing input and output viewpoints"""
+    # Note: input_views and output_view are already the converted display names (e.g. 'back-left'),
+    # not the original view keys (e.g. 'back_left'), so they can be used directly
     view_descriptions = []
     for i, view_name in enumerate(input_views, 1):
         view_descriptions.append(f"<image {i}> is the {view_name} view")
@@ -452,34 +452,34 @@ def process_split_data(
     sampling_config: Optional[Dict] = None
 ) -> None:
     """
-    处理split数据并生成最终数据
+    Process split data and generate final data
     
     Args:
-        split_dir: split目录
-        final_dir: final目录
-        split_type: "train" 或 "eval"
-        image_count_category: 图像数量类别
-        target_count: 目标生成数量
-        generated_ids: 已生成的唯一ID集合
-        sub_type: 子类型（"outdoor"）
-        sampling_config: 采样配置字典
+        split_dir: split directory
+        final_dir: final directory
+        split_type: "train" or "eval"
+        image_count_category: image count category
+        target_count: target generation count
+        generated_ids: set of already-generated unique IDs
+        sub_type: subtype ("outdoor")
+        sampling_config: sampling config dict
     """
-    # 加载split数据
+    # Load split data
     samples = load_split_data(split_dir, split_type, sub_type)
     
     if not samples:
-        print(f"未找到 {split_type}/{sub_type} 数据")
+        print(f"No data found for {split_type}/{sub_type}")
         return
     
-    # 设置随机种子
+    # Set random seed
     random.seed(RANDOM_SEED)
     
-    # 处理样本
-    completed = len(generated_ids)  # 从已生成数量开始计数
+    # Process samples
+    completed = len(generated_ids)  # Start count from already-generated count
     current_idx = len(generated_ids)
-    max_attempts = target_count * 10  # 最多尝试次数
+    max_attempts = target_count * 10  # Maximum number of attempts
     
-    # 统计信息
+    # Statistics
     total_attempts = 0
     successful_attempts = 0
     
@@ -496,7 +496,7 @@ def process_split_data(
             attempt += 1
             total_attempts += 1
             
-            # 根据image_count_category为每个样本随机确定输入视角数量
+            # Randomly determine input viewpoint count per sample based on image_count_category
             if image_count_category == "1-3":
                 num_input_views = random.randint(1, 3)
             elif image_count_category == "4-5":
@@ -506,19 +506,19 @@ def process_split_data(
             else:  # >=8
                 num_input_views = random.randint(8, 9)
             
-            # 随机选择一个全景图
+            # Randomly select a panoramic image
             sample = random.choice(samples)
             equi_path = sample['equi_path']
             
-            # 采样一个样本
+            # Sample one sample
             sampled = sample_one(equi_path, num_input_views, sampling_config)
             if not sampled:
                 continue
             
-            # 生成唯一ID
-            # 构建 view_config 字符串，包含视角配置信息
+            # Generate unique ID
+            # Build view_config string containing viewpoint configuration info
             view_config = f"y{sampled['base_yaw']:.4f}_p{sampled['base_pitch']:.4f}_i{','.join(sorted(sampled['input_views']))}_o{sampled['output_view']}"
-            # 如果 SAVE_ORIGINAL_STRING=True，需要获取原始字符串以便保存
+            # If SAVE_ORIGINAL_STRING=True, get the original string for saving
             from utils.common import SAVE_ORIGINAL_STRING
             unique_id_result = generate_unique_id(
                 "spatial",
@@ -528,23 +528,23 @@ def process_split_data(
                 view_config=view_config
             )
             
-            # 提取用于检查的唯一ID（如果是元组，使用 MD5 哈希；如果是字符串，直接使用）
+            # Extract unique ID for checking (use MD5 hash if tuple, or use string directly)
             unique_id = unique_id_result[0] if isinstance(unique_id_result, tuple) else unique_id_result
             
             if unique_id in generated_ids:
                 print(f"unique_id: {unique_id} already exists")
                 continue
             
-            # 生成prompt
+            # Generate prompt
             prompt = generate_prompt(sampled['input_views'], sampled['output_view'])
             
-            # 准备图像文件
+            # Prepare image files
             image_files = {}
             for i, img in enumerate(sampled['input_images']):
                 image_files[f"image_{i+1}.jpg"] = Image.fromarray(img)
             image_files["image_output.jpg"] = Image.fromarray(sampled['output_image'])
             
-            # 构建预期的图像路径（save_sample_data会更新为实际路径）
+            # Build expected image paths (save_sample_data will update to actual paths)
             if sub_type:
                 data_dir = final_dir / split_type / sub_type / image_count_category / "data" / f"{current_idx:08d}"
             else:
@@ -553,7 +553,7 @@ def process_split_data(
             input_image_paths = [str(data_dir / f"image_{i+1}.jpg") for i in range(len(sampled['input_images']))]
             output_image_path = str(data_dir / "image_output.jpg")
             
-            # 构建JSON数据
+            # Build JSON data
             json_data = {
                 'equi_path': str(equi_path),
                 'num_input_views': num_input_views,
@@ -566,14 +566,14 @@ def process_split_data(
                 'output_image': output_image_path
             }
             
-            # 保存数据（对于outdoor，需要传递sub_type）
+            # Save data (for outdoor, sub_type must be passed)
             from utils.common import save_sample_data
             success = save_sample_data(
                 final_dir,
                 split_type,
                 image_count_category,
                 current_idx,
-                unique_id_result,  # 可能是字符串或 (md5_hash, original_string) 元组
+                unique_id_result,  # May be a string or (md5_hash, original_string) tuple
                 json_data,
                 image_files,
                 sub_type=sub_type
@@ -586,47 +586,47 @@ def process_split_data(
                 current_idx += 1
                 pbar.update(1)
                 
-                # 更新进度条描述，显示详细统计信息
+                # Update progress bar description with detailed statistics
                 success_rate = (successful_attempts / total_attempts * 100) if total_attempts > 0 else 0
                 pbar.set_description(
                     f"{split_type}/{image_count_category} | "
-                    f"完成:{completed}/{target_count} | "
-                    f"尝试:{total_attempts} | "
-                    f"成功率:{success_rate:.1f}%"
+                    f"Done:{completed}/{target_count} | "
+                    f"Attempts:{total_attempts} | "
+                    f"SuccessRate:{success_rate:.1f}%"
                 )
     
-    print(f"\n{split_type}/{image_count_category} 完成: {completed}/{target_count}")
+    print(f"\n{split_type}/{image_count_category} done: {completed}/{target_count}")
 
 
 def main():
-    """主函数"""
+    """Main function"""
     print("=" * 80)
-    print("Spatial Outdoor数据生成脚本")
+    print("Spatial Outdoor data generation script")
     print("=" * 80)
-    print(f"Split目录: {SPLIT_DIR}")
-    print(f"Final目录: {FINAL_DIR}")
-    print(f"生成配置: {GEN_CONFIG}")
+    print(f"Split directory: {SPLIT_DIR}")
+    print(f"Final directory: {FINAL_DIR}")
+    print(f"Generation config: {GEN_CONFIG}")
     print("=" * 80)
     
-    # 创建final目录
+    # Create final directory
     FINAL_DIR.mkdir(parents=True, exist_ok=True)
     
-    # 处理train和eval数据
+    # Process train and eval data
     for split_type in ["train", "eval"]:
-        print(f"\n处理 {split_type} 数据...")
+        print(f"\nProcessing {split_type} data...")
         
         for image_count_category, config in GEN_CONFIG.items():
             target_count = config.get(split_type, 0)
             
             if target_count <= 0:
-                print(f"跳过 {split_type}/{image_count_category} 数据生成（目标数量为0）")
+                print(f"Skipping {split_type}/{image_count_category} data generation (target count is 0)")
                 continue
             
-            # 加载已生成的唯一识别编号
+            # Load already-generated unique IDs
             generated_ids = load_generated_ids(FINAL_DIR, split_type, image_count_category)
-            print(f"已加载 {len(generated_ids)} 个已生成的样本ID")
+            print(f"Loaded {len(generated_ids)} already-generated sample IDs")
             
-            # 处理数据
+            # Process data
             process_split_data(
                 split_dir=SPLIT_DIR,
                 final_dir=FINAL_DIR,
@@ -637,7 +637,7 @@ def main():
                 sub_type="outdoor"
             )
     
-    print("\n处理完成！")
+    print("\nProcessing complete!")
 
 
 if __name__ == "__main__":

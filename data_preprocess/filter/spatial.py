@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Spatial数据筛选脚本
+Spatial data filtering script
 
-功能：
-1. 统一控制outdoor、indoor、object三个子类型的筛选配置和数量
-2. 从final/spatial目录读取数据（按子类型组织）
-3. 先加载所有三类数据，合并后一起打乱采样，取前n项
-4. 转换为最简格式，只保留: task, idx, prompt, input_images, output_image
-5. 重新排序编号保存到filter/spatial目录（不包含子类型路径）
+Features:
+1. Unified control of filter config and count for outdoor, indoor, object subtypes
+2. Read data from final/spatial directory (organized by subtype)
+3. Load all three types of data, merge, shuffle, and take the first n
+4. Convert to minimal format, keeping only: task, idx, prompt, input_images, output_image
+5. Re-number and save to filter/spatial directory (without subtype path)
 """
 
 import json
@@ -17,23 +17,23 @@ import hashlib
 from pathlib import Path
 from typing import Dict, Any, List
 
-# 添加utils路径
+# Add utils path
 import sys
 CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(CURRENT_DIR))
 
 from utils.convert_to_minimal import convert_to_minimal
 
-# ====== 配置参数 ======
+# ====== Configuration parameters ======
 FINAL_DIR = (Path(__file__).resolve().parent.parent.parent / "data" / "final" / "spatial")
 FILTER_DIR = (Path(__file__).resolve().parent.parent.parent / "data" / "filter" / "spatial")
 # You can override FILTER_DIR to use a custom path if needed
 
-# 子类型选择：outdoor、indoor或object
-# 设置为 None 表示处理所有子类型，设置为具体子类型字符串则只处理该子类型
-SUB_TYPE = None  # 修改此值来选择要处理的子类型，None表示处理所有子类型
+# Subtype selection: outdoor, indoor, or object
+# Set to None to process all subtypes, or a specific subtype string to process only that subtype
+SUB_TYPE = None  # Modify this value to select the subtype to process; None processes all subtypes
 
-# 筛选配置：{sub_type: {image_count_category: {train: count, eval: count}}}
+# Filter config: {sub_type: {image_count_category: {train: count, eval: count}}}
 FILTER_CONFIG = {
     "object": {
         "1-3": {"train": 10000, "eval": 90},
@@ -55,39 +55,39 @@ FILTER_CONFIG = {
     },
 }
 
-# 随机种子
+# Random seed
 RANDOM_SEED = 42
 # ======================
 
 
 def get_deterministic_seed(seed_str: str) -> int:
     """
-    生成确定性的随机种子（使用hashlib确保跨运行的一致性）
+    Generate a deterministic random seed (using hashlib to ensure cross-run consistency)
     
     Args:
-        seed_str: 种子字符串
+        seed_str: seed string
     
     Returns:
-        确定性的整数种子
+        deterministic integer seed
     """
-    # 使用hashlib生成确定性的哈希值
+    # Use hashlib to generate a deterministic hash value
     hash_obj = hashlib.md5(seed_str.encode('utf-8'))
     hash_int = int(hash_obj.hexdigest(), 16)
-    # 取模确保在合理范围内
+    # Modulo to keep within reasonable range
     return hash_int % (2**31)
 
 
 def filter_samples(samples: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    筛选样本（对于spatial，目前全部保留）
+    Filter samples (for spatial, all are currently retained)
     
     Args:
-        samples: 样本列表
+        samples: list of samples
     
     Returns:
-        筛选后的样本列表
+        filtered sample list
     """
-    # 对于spatial，目前全部保留
+    # For spatial, all samples are currently retained
 
     filtered = []
     for sample in samples:
@@ -100,66 +100,66 @@ def filter_samples(samples: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def main():
-    """主函数"""
-    # 确定要处理的子类型列表
+    """Main function"""
+    # Determine the list of subtypes to process
     if SUB_TYPE is None:
-        # 处理所有子类型
+        # Process all subtypes
         sub_types_to_process = list(FILTER_CONFIG.keys())
         print("=" * 80)
-        print("Spatial 数据筛选脚本 - 处理所有子类型（合并后统一采样）")
+        print("Spatial data filtering script - processing all subtypes (merged unified sampling)")
         print("=" * 80)
     else:
-        # 只处理指定的子类型
+        # Process only the specified subtype
         if SUB_TYPE not in FILTER_CONFIG:
-            raise ValueError(f"不支持的子类型: {SUB_TYPE}，支持的类型: {list(FILTER_CONFIG.keys())}")
+            raise ValueError(f"Unsupported subtype: {SUB_TYPE}, supported types: {list(FILTER_CONFIG.keys())}")
         sub_types_to_process = [SUB_TYPE]
         print("=" * 80)
-        print(f"Spatial {SUB_TYPE.upper()}数据筛选脚本")
+        print(f"Spatial {SUB_TYPE.upper()} data filtering script")
         print("=" * 80)
     
-    print(f"Final目录: {FINAL_DIR}")
-    print(f"Filter目录: {FILTER_DIR}")
-    print(f"将处理的子类型: {sub_types_to_process}")
-    print(f"筛选配置: {FILTER_CONFIG}")
+    print(f"Final directory: {FINAL_DIR}")
+    print(f"Filter directory: {FILTER_DIR}")
+    print(f"Subtypes to process: {sub_types_to_process}")
+    print(f"Filter config: {FILTER_CONFIG}")
     print("=" * 80)
     
     if not FINAL_DIR.exists():
-        print(f"错误: Final目录不存在: {FINAL_DIR}")
+        print(f"Error: Final directory does not exist: {FINAL_DIR}")
         return
     
-    # 确保 FILTER_DIR 存在
+    # Ensure FILTER_DIR exists
     FILTER_DIR.mkdir(parents=True, exist_ok=True)
     
-    # 对于train，清除整个train目录后重新构建
+    # For train, clear the entire train directory and rebuild
     train_dir = FILTER_DIR / "train"
     if train_dir.exists():
-        print(f"清除 Train 目录: {train_dir}")
+        print(f"Clearing Train directory: {train_dir}")
         shutil.rmtree(train_dir)
     train_dir.mkdir(parents=True, exist_ok=True)
     
-    # 收集所有image_count_category（从所有子类型配置中收集）
+    # Collect all image_count_categories (from all subtype configs)
     all_categories = set()
     for sub_type_config in FILTER_CONFIG.values():
         all_categories.update(sub_type_config.keys())
     all_categories = sorted(list(all_categories))
     
-    # 处理train和eval数据
+    # Process train and eval data
     for split_type in ["train", "eval"]:
         print(f"\n{'=' * 80}")
-        print(f"处理 {split_type} 数据")
+        print(f"Processing {split_type} data")
         print(f"{'=' * 80}")
         
-        # 对于每个image_count_category，合并所有子类型的数据后统一处理
+        # For each image_count_category, merge all subtype data and process together
         for image_count_category in all_categories:
-            print(f"\n处理类别: {image_count_category}")
+            print(f"\nProcessing category: {image_count_category}")
             
-            # 收集所有子类型的数据
+            # Collect data from all subtypes
             all_samples = []
             category_total_count = 0
-            sub_type_counts = {}  # 记录每个子类型的配置数量
+            sub_type_counts = {}  # Record configured count for each subtype
             
             for current_sub_type in sub_types_to_process:
-                # 计算该子类型和类别的目标数量
+                # Calculate target count for this subtype and category
                 filter_config = FILTER_CONFIG[current_sub_type]
                 if image_count_category not in filter_config:
                     target_count = None
@@ -173,12 +173,12 @@ def main():
                     category_total_count += target_count
                     sub_type_counts[current_sub_type] = target_count
                 
-                # 读取该子类型和类别的样本
+                # Read samples for this subtype and category
                 sub_type_dir = FINAL_DIR / split_type / current_sub_type
                 json_dir = sub_type_dir / image_count_category / "json"
                 
                 if not json_dir.exists():
-                    print(f"  跳过 {current_sub_type}: JSON目录不存在")
+                    print(f"  Skipping {current_sub_type}: JSON directory does not exist")
                     continue
                 
                 samples = []
@@ -186,37 +186,37 @@ def main():
                     try:
                         with open(json_file, 'r', encoding='utf-8') as f:
                             sample = json.load(f)
-                            # 保存子类型信息和原始idx
+                            # Save subtype info and original idx
                             sample['_sub_type'] = current_sub_type
                             sample['_original_idx'] = int(json_file.stem)
                             samples.append(sample)
                     except Exception as e:
-                        print(f"  警告: 读取JSON文件失败 {json_file}: {e}")
+                        print(f"  Warning: failed to read JSON file {json_file}: {e}")
                         continue
                 
-                count_info = f"加载了 {len(samples)} 个样本"
+                count_info = f"Loaded {len(samples)} samples"
                 if current_sub_type in sub_type_counts:
-                    count_info += f" (配置数量: {sub_type_counts[current_sub_type]})"
+                    count_info += f" (configured count: {sub_type_counts[current_sub_type]})"
                 print(f"  {current_sub_type}: {count_info}")
                 all_samples.extend(samples)
             
             if not all_samples:
-                print(f"  跳过: 没有找到任何样本")
+                print(f"  Skipping: no samples found")
                 continue
             
-            print(f"  总计加载了 {len(all_samples)} 个样本（来自所有子类型）")
+            print(f"  Total loaded: {len(all_samples)} samples (from all subtypes)")
             
-            # 筛选样本
+            # Filter samples
             filtered_samples = filter_samples(all_samples)
-            print(f"  筛选后: {len(filtered_samples)} 个样本")
+            print(f"  After filtering: {len(filtered_samples)} samples")
             
-            # 计算目标总数（所有子类型配置的总和）
+            # Calculate total target count (sum of all subtype configs)
             target_count = category_total_count if category_total_count > 0 else None
             
             if target_count is not None:
-                print(f"  目标总数: {target_count}（所有子类型配置的总和）")
+                print(f"  Target total: {target_count} (sum of all subtype configs)")
             
-            # 对于eval，检查现有数据数量
+            # For eval, check the existing data count
             output_dir = FILTER_DIR / split_type / image_count_category
             existing_count = 0
             existing_identifiers = set()
@@ -224,30 +224,30 @@ def main():
                 existing_files = list(output_dir.glob("*.json"))
                 existing_count = len(existing_files)
                 if target_count is not None and existing_count >= target_count:
-                    print(f"  Eval数据已满足目标数量 ({existing_count} >= {target_count})，跳过")
+                    print(f"  Eval data already meets target count ({existing_count} >= {target_count}), skipping")
                     continue
                 elif existing_count > 0:
-                    print(f"  现有Eval数据: {existing_count} 个，目标: {target_count}，需要补足 {target_count - existing_count} 个")
-                    # 读取现有文件的unique_id或其他唯一标识
+                    print(f"  Existing Eval data: {existing_count}, target: {target_count}, need {target_count - existing_count} more")
+                    # Read unique_id or other unique identifier from existing files
                     for existing_file in output_dir.glob("*.json"):
                         try:
                             with open(existing_file, 'r', encoding='utf-8') as f:
                                 existing_sample = json.load(f)
-                                # 尝试使用unique_id，如果没有则使用其他唯一标识
+                                # Try to use unique_id; fall back to other unique identifier if unavailable
                                 unique_id = existing_sample.get("unique_id")
                                 if unique_id:
                                     existing_identifiers.add(unique_id)
                                 else:
-                                    # 使用source_file+source_line+true_index作为备选
+                                    # Use source_file+source_line+true_index as fallback
                                     source_file = existing_sample.get("source_file", "")
                                     source_line = existing_sample.get("source_line", -1)
                                     true_index = existing_sample.get("true_index", -1)
                                     existing_identifiers.add((source_file, source_line, true_index))
                         except Exception as e:
-                            print(f"  警告: 读取现有文件失败 {existing_file}: {e}")
+                            print(f"  Warning: failed to read existing file {existing_file}: {e}")
                             continue
             
-            # 对于eval，需要排除已存在的样本
+            # For eval, exclude already existing samples
             if split_type == "eval" and existing_count > 0:
                 original_count = len(filtered_samples)
                 filtered_samples = [
@@ -257,45 +257,45 @@ def main():
                         (sample.get("source_file", ""), sample.get("source_line", -1), sample.get("true_index", -1)) in existing_identifiers
                     )
                 ]
-                print(f"  排除已存在样本后: {len(filtered_samples)} 个样本（移除了 {original_count - len(filtered_samples)} 个）")
+                print(f"  After excluding existing samples: {len(filtered_samples)} samples (removed {original_count - len(filtered_samples)})")
             
-            # 如果配置了目标数量且筛选后样本数量多于目标数量，打乱并取前n个
+            # If target count is configured and filtered samples exceed it, shuffle and take the first n
             if target_count is not None:
                 if split_type == "eval":
-                    # eval需要补足的数量
+                    # Number needed to fill eval quota
                     needed_count = target_count - existing_count
                     if needed_count > 0 and len(filtered_samples) > needed_count:
-                        # 设置随机种子以确保可重现性（基于split_type和image_count_category）
+                        # Set random seed for reproducibility (based on split_type and image_count_category)
                         seed_str = f"{RANDOM_SEED}_{split_type}_{image_count_category}"
                         seed_hash = get_deterministic_seed(seed_str)
                         random.seed(seed_hash)
                         random.shuffle(filtered_samples)
-                        # 取前needed_count个
+                        # Take the first needed_count
                         filtered_samples = filtered_samples[:needed_count]
-                        print(f"  打乱后取前 {needed_count} 个样本用于补足")
+                        print(f"  Shuffled and took first {needed_count} samples to fill quota")
                     elif needed_count > 0:
-                        print(f"  样本数量 {len(filtered_samples)} <= 需要补足数量 {needed_count}，保留所有样本用于补足")
+                        print(f"  Sample count {len(filtered_samples)} <= needed count {needed_count}, keeping all samples to fill quota")
                 else:
-                    # train保持原有逻辑
+                    # Train keeps the original logic
                     if len(filtered_samples) > target_count:
-                        # 设置随机种子以确保可重现性（基于split_type和image_count_category）
+                        # Set random seed for reproducibility (based on split_type and image_count_category)
                         seed_str = f"{RANDOM_SEED}_{split_type}_{image_count_category}"
                         seed_hash = get_deterministic_seed(seed_str)
                         random.seed(seed_hash)
                         random.shuffle(filtered_samples)
-                        # 取前target_count个
+                        # Take the first target_count
                         filtered_samples = filtered_samples[:target_count]
-                        print(f"  打乱后取前 {target_count} 个样本")
+                        print(f"  Shuffled and took first {target_count} samples")
                     else:
-                        print(f"  样本数量 {len(filtered_samples)} <= 目标数量 {target_count}，保留所有样本")
+                        print(f"  Sample count {len(filtered_samples)} <= target count {target_count}, keeping all samples")
             else:
-                print(f"  无数量限制，保留所有 {len(filtered_samples)} 个样本")
+                print(f"  No count limit, keeping all {len(filtered_samples)} samples")
             
-            # 转换为最简格式并按序编号保存
+            # Convert to minimal format and save with sequential numbering
             output_dir.mkdir(parents=True, exist_ok=True)
             
             if split_type == "eval" and existing_count > 0:
-                # eval：找到当前最大编号，从下一个编号开始
+                # eval: find current max index, start from next index
                 existing_indices = []
                 for existing_file in output_dir.glob("*.json"):
                     try:
@@ -305,16 +305,16 @@ def main():
                         continue
                 start_idx = max(existing_indices, default=0) + 1
             else:
-                # train：重新编号，从1开始
+                # train: re-number starting from 1
                 start_idx = 1
-                # 清空已存在的文件（仅对train）
+                # Clear existing files (train only)
                 for existing_file in output_dir.glob("*.json"):
                     existing_file.unlink()
             
-            # 重新排序编号保存
+            # Save with re-numbered indices
             saved_count = 0
             for i, sample in enumerate(filtered_samples, start=start_idx):
-                # 移除临时字段
+                # Remove temporary fields
                 sub_type = sample.pop('_sub_type', 'unknown')
                 original_idx = sample.pop('_original_idx', -1)
                 
@@ -325,10 +325,10 @@ def main():
                 saved_count += 1
             
             final_count = existing_count + saved_count if split_type == "eval" and existing_count > 0 else saved_count
-            print(f"  已保存到: {output_dir}（共 {final_count} 个样本，编号: {start_idx}-{start_idx + saved_count - 1 if saved_count > 0 else start_idx - 1}）")
+            print(f"  Saved to: {output_dir} (total {final_count} samples, indices: {start_idx}-{start_idx + saved_count - 1 if saved_count > 0 else start_idx - 1})")
     
     print(f"\n{'=' * 80}")
-    print("所有数据处理完成！")
+    print("All data processing complete!")
     print(f"{'=' * 80}")
 
 

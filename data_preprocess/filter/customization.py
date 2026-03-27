@@ -1,14 +1,14 @@
 import os
 #!/usr/bin/env python3
 """
-Customization数据筛选脚本
+Customization data filtering script
 
-功能：
-1. 从final/customization目录读取数据
-2. 检查是否有consistency_scores和following_score，如果没有则调用API补全
-3. 基于threshold进行过滤筛选
-4. 转换为最简格式，只保留: task, idx, prompt, input_images, output_image
-5. 保存到filter/customization目录
+Features:
+1. Read data from the final/customization directory
+2. Check for consistency_scores and following_score; call API to fill missing scores
+3. Filter samples based on threshold
+4. Convert to minimal format, keeping only: task, idx, prompt, input_images, output_image
+5. Save to filter/customization directory
 """
 
 import json
@@ -22,29 +22,29 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-# 添加utils路径
+# Add utils path
 CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(CURRENT_DIR))
 
 from utils.convert_to_minimal import convert_to_minimal
 
-# 添加参考评分脚本路径
+# Add reference scoring script path
 SCORE_MODULE_PATH = None  # Set this to your score module path
 
-# ====== 配置参数 ======
+# ====== Configuration parameters ======
 FINAL_DIR = (Path(__file__).resolve().parent.parent.parent / "data" / "final" / "customization")
 FILTER_DIR = (Path(__file__).resolve().parent.parent.parent / "data" / "filter" / "customization")
 # You can override FILTER_DIR to use a custom path if needed
 
-# 筛选阈值
+# Filtering thresholds
 SKIP_SCORE = False
-CONSISTENCY_SCORE_THRESHOLD = 6.0  # consistency_scores列表中每个分数都需要 >= 此阈值
-FOLLOWING_SCORE_THRESHOLD = 6.0    # following_score需要 >= 此阈值
+CONSISTENCY_SCORE_THRESHOLD = 6.0  # Each score in consistency_scores list must be >= this threshold
+FOLLOWING_SCORE_THRESHOLD = 6.0    # following_score must be >= this threshold
 
-# 并行worker数量
+# Number of parallel workers
 MAX_PARALLEL_WORKERS = 256
 
-# 筛选配置：{image_count_category: {train: count, eval: count}}
+# Filter config: {image_count_category: {train: count, eval: count}}
 FILTER_CONFIG = {
     "1-3": {"train": 20000, "eval": 250},
     "4-5": {"train": 20000, "eval": 250},
@@ -52,43 +52,43 @@ FILTER_CONFIG = {
     ">=8": {"train": 30000, "eval": 250},
 }
 
-# 随机种子
+# Random seed
 RANDOM_SEED = 42
 # ======================
 
 
 def get_deterministic_seed(seed_str: str) -> int:
     """
-    生成确定性的随机种子（使用hashlib确保跨运行的一致性）
+    Generate a deterministic random seed (using hashlib to ensure cross-run consistency)
     
     Args:
-        seed_str: 种子字符串
+        seed_str: seed string
     
     Returns:
-        确定性的整数种子
+        deterministic integer seed
     """
-    # 使用hashlib生成确定性的哈希值
+    # Use hashlib to generate a deterministic hash value
     hash_obj = hashlib.md5(seed_str.encode('utf-8'))
     hash_int = int(hash_obj.hexdigest(), 16)
-    # 取模确保在合理范围内
+    # Modulo to keep within reasonable range
     return hash_int % (2**31)
 
 
 def get_combination_key_from_sample(sample: Dict[str, Any]) -> Optional[str]:
     """
-    从样本的input_images生成combination_key（用于customization任务）
+    Generate combination_key from sample input_images (for customization task)
     
     Args:
-        sample: 样本数据
+        sample: sample data
     
     Returns:
-        combination_key，如果无法生成则返回None
+        combination_key, or None if it cannot be generated
     """
     input_images = sample.get("input_images", [])
     if not isinstance(input_images, list) or len(input_images) == 0:
         return None
     
-    # 排序文件列表并生成MD5哈希
+    # Sort file list and generate MD5 hash
     sorted_files = sorted(input_images)
     key_str = "|".join(sorted_files)
     return hashlib.md5(key_str.encode()).hexdigest()
@@ -96,25 +96,25 @@ def get_combination_key_from_sample(sample: Dict[str, Any]) -> Optional[str]:
 
 def get_unique_id_from_sample(sample: Dict[str, Any]) -> Optional[str]:
     """
-    从样本获取或生成unique_id（用于customization任务）
+    Get or generate unique_id from sample (for customization task)
     
     Args:
-        sample: 样本数据
+        sample: sample data
     
     Returns:
-        unique_id，如果无法生成则返回None
+        unique_id, or None if it cannot be generated
     """
-    # 优先使用已有的unique_id
+    # Prefer existing unique_id if available
     unique_id = sample.get("unique_id")
     if unique_id:
         return unique_id
     
-    # 如果没有unique_id，从input_images生成combination_key，然后生成unique_id
+    # If no unique_id, generate combination_key from input_images, then generate unique_id
     combination_key = get_combination_key_from_sample(sample)
     if combination_key:
-        # 对于customization，unique_id格式是 customization_{combination_key}
-        # 但可能还会经过MD5处理，这里我们直接使用原始格式
-        # 如果需要MD5处理，需要检查配置，但为了简单起见，我们使用原始格式
+        # For customization, unique_id format is customization_{combination_key}
+        # May also be MD5-hashed; here we use the raw format for simplicity
+        # If MD5 hashing is required, check config; for simplicity we use the raw format
         return f"customization_{combination_key}"
     
     return None
@@ -164,22 +164,22 @@ def load_score_module():
 
 def has_score_fields(sample: Dict[str, Any]) -> bool:
     """
-    检查样本是否有评分字段
+    Check whether a sample has scoring fields
     
     Args:
-        sample: 样本数据
+        sample: sample data
     
     Returns:
-        是否有consistency_scores和following_score
+        Whether the sample has consistency_scores and following_score
     """
     consistency_scores = sample.get("consistency_scores")
     following_score = sample.get("following_score")
     
-    # 检查consistency_scores是否为有效列表
+    # Check whether consistency_scores is a valid list
     if not isinstance(consistency_scores, list) or len(consistency_scores) == 0:
         return False
     
-    # 检查following_score是否为有效数值
+    # Check whether following_score is a valid number
     if following_score is None or not isinstance(following_score, (int, float)):
         return False
     
@@ -188,27 +188,27 @@ def has_score_fields(sample: Dict[str, Any]) -> bool:
 
 def evaluate_sample(json_path: Path, score_module, gemini_generator) -> Optional[Dict[str, Any]]:
     """
-    对单个样本进行评分（使用Gemini-3-flash）
+    Score a single sample (using Gemini-3-flash)
     
     Args:
-        json_path: JSON文件路径
-        score_module: 评分模块
-        gemini_generator: Gemini生成器实例
+        json_path: JSON file path
+        score_module: scoring module
+        gemini_generator: Gemini generator instance
     
     Returns:
-        评分结果字典，包含consistency_scores, following_score, overall_reasoning
-        如果失败返回None
+        Score result dict containing consistency_scores, following_score, overall_reasoning
+        Returns None on failure
     """
     try:
-        # 读取样本数据
+        # Read sample data
         with open(json_path, 'r', encoding='utf-8') as f:
             sample_data = json.load(f)
         
         sample_id = json_path.stem
         
-        # 只使用Gemini进行评分
+        # Use Gemini only for scoring
         if gemini_generator is None:
-            print(f"  错误: Gemini生成器未初始化")
+            print(f"  Error: Gemini generator not initialized")
             return None
         
         evaluate_with_gemini = getattr(score_module, 'evaluate_with_gemini')
@@ -216,7 +216,7 @@ def evaluate_sample(json_path: Path, score_module, gemini_generator) -> Optional
         
         return result
     except Exception as e:
-        print(f"  错误: 评分失败 {json_path}: {e}")
+        print(f"  Error: scoring failed {json_path}: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -224,62 +224,62 @@ def evaluate_sample(json_path: Path, score_module, gemini_generator) -> Optional
 
 def save_score_to_json(json_path: Path, score_result: Dict[str, Any]) -> bool:
     """
-    将评分结果保存到JSON文件中（不破坏已有字段）
+    Save scoring results to the JSON file (without overwriting existing fields)
     
     Args:
-        json_path: JSON文件路径
-        score_result: 评分结果字典
+        json_path: JSON file path
+        score_result: score result dict
     
     Returns:
-        是否保存成功
+        Whether saving succeeded
     """
     try:
-        # 读取现有数据
+        # Read existing data
         with open(json_path, 'r', encoding='utf-8') as f:
             sample_data = json.load(f)
         
-        # 更新评分字段
+        # Update scoring fields
         sample_data["consistency_scores"] = score_result.get("consistency_scores", [])
         sample_data["following_score"] = score_result.get("following_score")
         if "overall_reasoning" in score_result:
             sample_data["overall_reasoning"] = score_result.get("overall_reasoning")
         
-        # 保存回文件
+        # Write back to file
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(sample_data, f, ensure_ascii=False, indent=2)
         
         return True
     except Exception as e:
-        print(f"  错误: 保存评分失败 {json_path}: {e}")
+        print(f"  Error: failed to save score {json_path}: {e}")
         return False
 
 
 def check_and_complete_scores(samples: List[Tuple[int, Path, Dict[str, Any]]], 
                                score_module, gemini_generator) -> List[Tuple[int, Path, Dict[str, Any]]]:
     """
-    检查并补全缺失的评分（并行处理）
+    Check and fill missing scores (parallel processing)
     
     Args:
-        samples: 样本列表，每个元素为(idx, json_path, sample_data)
-        score_module: 评分模块
-        gemini_generator: Gemini生成器实例
+        samples: list of (idx, json_path, sample_data) tuples
+        score_module: scoring module
+        gemini_generator: Gemini generator instance
     
     Returns:
-        更新后的样本列表（已补全评分并保存）
+        Updated sample list (scores filled and saved)
     """
-    # 找出需要评分的样本
+    # Find samples that need scoring
     samples_to_evaluate = []
     for idx, json_path, sample_data in samples:
         if not has_score_fields(sample_data):
             samples_to_evaluate.append((idx, json_path, sample_data))
     
     if not samples_to_evaluate:
-        print(f"  所有样本已有评分，无需补全")
+        print(f"  All samples already have scores, no need to fill")
         return samples
     
-    print(f"  需要补全 {len(samples_to_evaluate)} 个样本的评分...")
+    print(f"  Need to fill scores for {len(samples_to_evaluate)} samples...")
     
-    # 并行处理
+    # Parallel processing
     completed = 0
     total = len(samples_to_evaluate)
     lock = threading.Lock()
@@ -289,28 +289,28 @@ def check_and_complete_scores(samples: List[Tuple[int, Path, Dict[str, Any]]],
         nonlocal completed
         idx, json_path, sample_data = item
         
-        # 进行评分
+        # Perform scoring
         score_result = evaluate_sample(json_path, score_module, gemini_generator)
         
         if score_result is not None:
-            # 保存评分到JSON文件
+            # Save score to JSON file
             with save_lock:
                 if save_score_to_json(json_path, score_result):
-                    # 重新读取更新后的数据（确保数据是最新的）
+                    # Re-read updated data to ensure it is the latest
                     try:
                         with open(json_path, 'r', encoding='utf-8') as f:
                             sample_data = json.load(f)
                     except Exception as e:
-                        print(f"  警告: 重新读取失败 {json_path}: {e}")
+                        print(f"  Warning: failed to re-read {json_path}: {e}")
         
         with lock:
             completed += 1
-            status = "成功" if score_result is not None else "失败"
+            status = "success" if score_result is not None else "failed"
             print(f"  [{completed}/{total}] {json_path.name}: {status}")
         
         return (idx, json_path, sample_data)
     
-    # 使用ThreadPoolExecutor并行处理
+    # Use ThreadPoolExecutor for parallel processing
     with ThreadPoolExecutor(max_workers=MAX_PARALLEL_WORKERS) as executor:
         futures = {executor.submit(process_sample, item): item for item in samples_to_evaluate}
         
@@ -319,14 +319,14 @@ def check_and_complete_scores(samples: List[Tuple[int, Path, Dict[str, Any]]],
             idx, json_path, sample_data = future.result()
             updated_samples_map[(idx, json_path)] = (idx, json_path, sample_data)
     
-    # 更新样本列表：只更新被修改过的样本，其他样本保持内存中的数据
+    # Update sample list: only update modified samples; keep others in memory
     updated_samples = []
     for idx, json_path, sample_data in samples:
         if (idx, json_path) in updated_samples_map:
-            # 如果样本被更新过，使用更新后的数据（已从文件重新读取）
+            # If the sample was updated, use the refreshed data (re-read from file)
             updated_samples.append(updated_samples_map[(idx, json_path)])
         else:
-            # 如果样本没有被更新，直接使用内存中的数据，避免不必要的文件 I/O
+            # If the sample was not updated, use in-memory data to avoid unnecessary file I/O
             updated_samples.append((idx, json_path, sample_data))
     
     return updated_samples
@@ -334,26 +334,26 @@ def check_and_complete_scores(samples: List[Tuple[int, Path, Dict[str, Any]]],
 
 def filter_samples(samples: List[Tuple[int, Path, Dict[str, Any]]]) -> List[Tuple[int, Path, Dict[str, Any]]]:
     """
-    基于阈值筛选样本
+    Filter samples based on threshold
     
     Args:
-        samples: 样本列表，每个元素为(idx, json_path, sample_data)
+        samples: list of (idx, json_path, sample_data) tuples
     
     Returns:
-        筛选后的样本列表，保持 (idx, json_path, sample_data) 格式
+        Filtered sample list, keeping (idx, json_path, sample_data) format
     """
     filtered = []
     
     for idx, json_path, sample in samples:
-        # 检查评分字段
+        # Check scoring fields
         if not has_score_fields(sample):
-            # 如果没有评分字段，跳过（应该在之前已补全）
+            # Skip if no scoring fields (should have been filled earlier)
             continue
         
         consistency_scores = sample.get("consistency_scores", [])
         following_score = sample.get("following_score")
         
-        # 检查consistency_scores：列表中每个分数都需要 >= threshold
+        # Check consistency_scores: each score in the list must be >= threshold
         all_consistency_ok = True
         if isinstance(consistency_scores, list):
             for score in consistency_scores:
@@ -363,7 +363,7 @@ def filter_samples(samples: List[Tuple[int, Path, Dict[str, Any]]]) -> List[Tupl
         else:
             all_consistency_ok = False
         
-        # 检查following_score
+        # Check following_score
         following_ok = isinstance(following_score, (int, float)) and following_score >= FOLLOWING_SCORE_THRESHOLD
         
         input_num = len(sample.get("input_images", []))
@@ -372,7 +372,7 @@ def filter_samples(samples: List[Tuple[int, Path, Dict[str, Any]]]) -> List[Tupl
             print(f"More than 10 input images: {input_num}")
             within_threshold = False
         
-        # 两个条件都满足才保留
+        # Both conditions must be satisfied to keep the sample
         if all_consistency_ok and following_ok and within_threshold:
             filtered.append((idx, json_path, sample))
     
@@ -380,29 +380,29 @@ def filter_samples(samples: List[Tuple[int, Path, Dict[str, Any]]]) -> List[Tupl
 
 
 def main():
-    """主函数"""
+    """Main function"""
     print("=" * 80)
-    print("Customization数据筛选脚本")
+    print("Customization data filtering script")
     print("=" * 80)
-    print(f"Final目录: {FINAL_DIR}")
-    print(f"Filter目录: {FILTER_DIR}")
-    print(f"Consistency Score阈值: {CONSISTENCY_SCORE_THRESHOLD}")
-    print(f"Following Score阈值: {FOLLOWING_SCORE_THRESHOLD}")
-    print(f"筛选配置: {FILTER_CONFIG}")
+    print(f"Final directory: {FINAL_DIR}")
+    print(f"Filter directory: {FILTER_DIR}")
+    print(f"Consistency Score threshold: {CONSISTENCY_SCORE_THRESHOLD}")
+    print(f"Following Score threshold: {FOLLOWING_SCORE_THRESHOLD}")
+    print(f"Filter config: {FILTER_CONFIG}")
     print("=" * 80)
     
     if not FINAL_DIR.exists():
-        print(f"错误: Final目录不存在: {FINAL_DIR}")
+        print(f"Error: Final directory does not exist: {FINAL_DIR}")
         return
     
-    # 加载评分模块和初始化Gemini生成器
-    print("\n正在加载评分模块...")
+    # Load scoring module and initialize Gemini generator
+    print("\nLoading scoring module...")
     try:
         score_module = load_score_module()
         
-        # 初始化Gemini生成器（使用gemini-3-flash-preview进行评分）
-        # 注意：gemini_generator 会被多个线程并发使用，需要确保 GeminiAPIGenerator 是线程安全的
-        # 如果遇到并发问题，可以考虑为每个线程创建独立的实例
+        # Initialize Gemini generator (using gemini-3-flash-preview for scoring)
+        # Note: gemini_generator will be used concurrently by multiple threads; ensure GeminiAPIGenerator is thread-safe
+        # If concurrency issues arise, consider creating a separate instance per thread
         GEMINI_CONFIG = {
             "api_key": os.environ.get("GEMINI_API_KEY", ""),
             "model_name": "gemini-3-flash-preview",
@@ -417,67 +417,67 @@ def main():
             print_log=False,
             timeout=GEMINI_CONFIG["timeout"]
         )
-        print("评分模块加载完成")
+        print("Scoring module loaded")
     except Exception as e:
-        print(f"错误: 加载评分模块失败: {e}")
+        print(f"Error: failed to load scoring module: {e}")
         import traceback
         traceback.print_exc()
         return
     
-    # 确保 FILTER_DIR 存在
+    # Ensure FILTER_DIR exists
     FILTER_DIR.mkdir(parents=True, exist_ok=True)
     
-    # 处理train和eval数据
-    # 判断config中是否配置eval数据，如果配置则处理eval数据，否则只处理train数据
+    # Process train and eval data
+    # Check if eval data is configured; if so process eval, otherwise train only
     for split_type in ["train", "eval"]:
-        print(f"\n处理 {split_type} 数据...")
+        print(f"\nProcessing {split_type} data...")
         
-        # 对于train，清除整个train目录后重新构建
+        # For train, clear the entire train directory and rebuild
         if split_type == "train":
             train_dir = FILTER_DIR / "train"
             if train_dir.exists():
-                print(f"清除 Train 目录: {train_dir}")
+                print(f"Clearing Train directory: {train_dir}")
                 shutil.rmtree(train_dir)
             train_dir.mkdir(parents=True, exist_ok=True)
         
-        # 遍历所有image_count_category目录
+        # Iterate over all image_count_category directories
         for category_dir in (FINAL_DIR / split_type).glob("*"):
             if not category_dir.is_dir():
                 continue
             
             image_count_category = category_dir.name
             
-            # 检查是否有配置，如果没有配置则跳过数量控制
+            # Check config; skip count control if not configured
             if image_count_category not in FILTER_CONFIG:
-                print(f"\n处理类别: {image_count_category} (无数量限制)")
+                print(f"\nProcessing category: {image_count_category} (no count limit)")
                 target_count = None
             else:
                 target_count = FILTER_CONFIG[image_count_category].get(split_type)
                 if target_count is None:
-                    print(f"\n处理类别: {image_count_category} (无数量限制)")
+                    print(f"\nProcessing category: {image_count_category} (no count limit)")
                     target_count = None
                 else:
-                    print(f"\n处理类别: {image_count_category} (目标数量: {target_count})")
+                    print(f"\nProcessing category: {image_count_category} (target count: {target_count})")
             
             if split_type == "eval" and target_count is None:
                 continue
             
-            # 对于eval，检查现有数据数量
+            # For eval, check the existing data count
             output_dir = FILTER_DIR / split_type / image_count_category
             existing_count = 0
             if split_type == "eval" and output_dir.exists():
                 existing_files = list(output_dir.glob("*.json"))
                 existing_count = len(existing_files)
                 if target_count is not None and existing_count >= target_count:
-                    print(f"  Eval数据已满足目标数量 ({existing_count} >= {target_count})，跳过")
+                    print(f"  Eval data already meets target count ({existing_count} >= {target_count}), skipping")
                     continue
                 elif existing_count > 0:
-                    print(f"  现有Eval数据: {existing_count} 个，目标: {target_count}，需要补足 {target_count - existing_count} 个")
+                    print(f"  Existing Eval data: {existing_count}, target: {target_count}, need {target_count - existing_count} more")
             
-            # 读取JSON文件
+            # Read JSON files
             json_dir = category_dir / "json"
             if not json_dir.exists():
-                print(f"  跳过: JSON目录不存在")
+                print(f"  Skipping: JSON directory does not exist")
                 continue
             
             samples = []
@@ -485,87 +485,87 @@ def main():
                 try:
                     with open(json_file, 'r', encoding='utf-8') as f:
                         sample = json.load(f)
-                        # 提取idx
+                        # Extract idx
                         idx = int(json_file.stem)
                         samples.append((idx, json_file, sample))
                 except Exception as e:
-                    print(f"  警告: 读取JSON文件失败 {json_file}: {e}")
+                    print(f"  Warning: failed to read JSON file {json_file}: {e}")
                     continue
             
-            print(f"  加载了 {len(samples)} 个样本")
+            print(f"  Loaded {len(samples)} samples")
             
-            # 检查和补全评分
+            # Check and fill scores
             if not SKIP_SCORE:
-                print(f"  正在检查并补全评分...")
+                print(f"  Checking and filling scores...")
                 samples = check_and_complete_scores(samples, score_module, gemini_generator)
             else:
-                print(f"  跳过评分检查和补全")
+                print(f"  Skipping score check and fill")
             
-            # 筛选样本（基于阈值），直接返回 (idx, json_path, sample) 元组列表
-            # 注意：不对eval数据使用filter，直接使用原始samples
+            # Filter samples (based on threshold), return list of (idx, json_path, sample) tuples
+            # Note: do not filter eval data, use raw samples directly
             if split_type == "eval":
                 filtered_with_idx = samples
-                print(f"  Eval数据跳过筛选，使用原始样本: {len(filtered_with_idx)} 个样本")
+                print(f"  Eval data skips filtering, using raw samples: {len(filtered_with_idx)} samples")
             else:
                 filtered_with_idx = filter_samples(samples)
-                print(f"  筛选后: {len(filtered_with_idx)} 个样本")
+                print(f"  After filtering: {len(filtered_with_idx)} samples")
             
-            # 对于eval，需要排除已存在的样本（基于unique_id）
+            # For eval, exclude already existing samples (based on unique_id)
             if split_type == "eval" and existing_count > 0:
-                # 读取现有文件的unique_id
+                # Read unique_id from existing files
                 existing_identifiers = set()
                 for existing_file in output_dir.glob("*.json"):
                     try:
                         with open(existing_file, 'r', encoding='utf-8') as f:
                             existing_sample = json.load(f)
-                            # 对于customization，使用unique_id作为唯一标识
-                            # 如果没有unique_id，从input_images生成combination_key并生成unique_id
+                            # For customization, use unique_id as the unique identifier
+                            # If no unique_id, generate combination_key from input_images and produce unique_id
                             unique_id = get_unique_id_from_sample(existing_sample)
                             if unique_id:
                                 existing_identifiers.add(unique_id)
                     except Exception as e:
-                        print(f"  警告: 读取现有文件失败 {existing_file}: {e}")
+                        print(f"  Warning: failed to read existing file {existing_file}: {e}")
                         continue
                 
-                # 过滤掉已存在的样本
+                # Filter out already existing samples
                 original_count = len(filtered_with_idx)
                 filtered_with_idx = [
                     (idx, json_path, sample) for idx, json_path, sample in filtered_with_idx
                     if get_unique_id_from_sample(sample) not in existing_identifiers
                 ]
-                print(f"  排除已存在样本后: {len(filtered_with_idx)} 个样本（移除了 {original_count - len(filtered_with_idx)} 个）")
+                print(f"  After excluding existing samples: {len(filtered_with_idx)} samples (removed {original_count - len(filtered_with_idx)})")
             
-            # 如果配置了目标数量且筛选后样本数量多于目标数量，打乱并取前n个
+            # If target count is configured and filtered samples exceed it, shuffle and take the first n
             if target_count is not None:
                 if split_type == "eval":
-                    # eval需要补足的数量
+                    # Number needed to fill eval quota
                     needed_count = target_count - existing_count
                     if needed_count > 0 and len(filtered_with_idx) > needed_count:
-                        # 设置随机种子以确保可重现性（基于split_type和image_count_category）
+                        # Set random seed for reproducibility (based on split_type and image_count_category)
                         seed_str = f"{RANDOM_SEED}_{split_type}_{image_count_category}"
                         seed_hash = get_deterministic_seed(seed_str)
                         random.seed(seed_hash)
                         random.shuffle(filtered_with_idx)
-                        # 取前needed_count个
+                        # Take the first needed_count
                         filtered_with_idx = filtered_with_idx[:needed_count]
-                        print(f"  打乱后取前 {needed_count} 个样本用于补足")
+                        print(f"  Shuffled and took first {needed_count} samples to fill quota")
                 else:
-                    # train保持原有逻辑
+                    # Train keeps the original logic
                     if len(filtered_with_idx) > target_count:
-                        # 设置随机种子以确保可重现性（基于split_type和image_count_category）
+                        # Set random seed for reproducibility (based on split_type and image_count_category)
                         seed_str = f"{RANDOM_SEED}_{split_type}_{image_count_category}"
                         seed_hash = get_deterministic_seed(seed_str)
                         random.seed(seed_hash)
                         random.shuffle(filtered_with_idx)
-                        # 取前target_count个
+                        # Take the first target_count
                         filtered_with_idx = filtered_with_idx[:target_count]
-                        print(f"  打乱后取前 {target_count} 个样本")
+                        print(f"  Shuffled and took first {target_count} samples")
             
-            # 转换为最简格式并保存
+            # Convert to minimal format and save
             output_dir.mkdir(parents=True, exist_ok=True)
             
             if split_type == "eval" and existing_count > 0:
-                # eval：找到当前最大编号，从下一个编号开始
+                # eval: find current max index, start from next index
                 existing_indices = []
                 for existing_file in output_dir.glob("*.json"):
                     try:
@@ -575,11 +575,11 @@ def main():
                         continue
                 start_idx = max(existing_indices, default=0) + 1
             else:
-                # train：重新编号，从1开始
-                # 注意：train 目录已在第 410-415 行被完全删除并重建，此处无需再次清空文件
+                # train: re-number starting from 1
+                # Note: train directory was fully deleted and rebuilt above; no need to clear files here
                 start_idx = 1
             
-            # 保存样本
+            # Save samples
             for i, (original_idx, json_path, sample) in enumerate(filtered_with_idx, start=start_idx):
                 minimal = convert_to_minimal(sample, "customization", i)
                 output_file = output_dir / f"{i:08d}.json"
@@ -587,9 +587,9 @@ def main():
                     json.dump(minimal, f, ensure_ascii=False, indent=2)
             
             final_count = existing_count + len(filtered_with_idx) if split_type == "eval" and existing_count > 0 else len(filtered_with_idx)
-            print(f"  已保存到: {output_dir}（共 {final_count} 个样本）")
+            print(f"  Saved to: {output_dir} (total {final_count} samples)")
     
-    print("\n处理完成！")
+    print("\nProcessing complete!")
 
 
 if __name__ == "__main__":

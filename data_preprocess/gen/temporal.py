@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Temporal数据生成脚本
+Temporal data generation script
 
-功能：
-1. 从split/temporal目录读取train/eval数据
-2. 提取帧图像
-3. 调用LLM生成summary和temporal_score
-4. 保存到final/temporal/{train/eval}/{image_count_category}/data和json目录
-5. 支持唯一识别编号，避免重复生成
+Features:
+1. Read train/eval data from split/temporal directory
+2. Extract frame images
+3. Call LLM to generate summary and temporal_score
+4. Save to final/temporal/{train/eval}/{image_count_category}/data and json directories
+5. Support unique IDs to avoid duplicate generation
 """
 
 import json
@@ -26,9 +26,9 @@ from PIL import Image
 try:
     from decord import VideoReader, cpu
 except ImportError:
-    raise ImportError("需要安装 decord 库: pip install decord")
+    raise ImportError("The decord library is required: pip install decord")
 
-# 添加utils路径
+# Add utils path
 CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(CURRENT_DIR))
 
@@ -39,24 +39,24 @@ from utils.common import (
     generate_unique_id
 )
 
-# 确保项目根目录在路径中
+# Ensure project root is in sys.path
 MACRO_DIR = CURRENT_DIR.parent.parent
 if str(MACRO_DIR) not in sys.path:
     sys.path.insert(0, str(MACRO_DIR))
 
 from api_generator.text_generator.gemini_api import GeminiAPIGenerator
 
-# ====== 配置参数 ======
+# ====== Configuration parameters ======
 DATA_DIR = MACRO_DIR / "data"
 SPLIT_DIR = DATA_DIR / "split" / "temporal"
 FINAL_DIR = DATA_DIR / "final" / "temporal"
 
-# Gemini API 配置（通过环境变量设置）
+# Gemini API configuration (set via environment variables)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_API_URL = os.environ.get("GEMINI_API_URL", "")
 GEMINI_MODEL_NAME = os.environ.get("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
-# 生成配置：{image_count_category: {train: count, eval: count}}
+# Generation config: {image_count_category: {train: count, eval: count}}
 GEN_CONFIG = {
     "1-3": {"train": 43000, "eval": 500},
     "4-5": {"train": 30000, "eval": 500},
@@ -64,21 +64,21 @@ GEN_CONFIG = {
     ">=8": {"train": 35000, "eval": 500},
 }
 
-# 线程配置
+# Thread configuration
 MAX_WORKERS = 64
 MAX_TRIES = 3
 
-# 随机种子
+# Random seed
 RANDOM_SEED = 42
 
-# 日志配置
-LOG_TO_SHELL = False  # 是否输出日志到shell
+# Logging configuration
+LOG_TO_SHELL = False  # Whether to output logs to shell
 # ======================
 
-# ====== 线程局部存储 ======
+# ====== Thread-local storage ======
 thread_local = threading.local()
 
-# ====== 唯一ID检查锁 ======
+# ====== Unique ID check lock ======
 unique_id_lock = threading.Lock()
 # =============================
 
@@ -89,15 +89,15 @@ def get_or_create_generator(
     max_try: int
 ) -> GeminiAPIGenerator:
     """
-    获取或创建线程局部生成器
+    Get or create thread-local generator
 
     Args:
-        gemini_api_key: Gemini API密钥
-        gemini_model_name: Gemini模型名称
-        max_try: 最大重试次数
+        gemini_api_key: Gemini API key
+        gemini_model_name: Gemini model name
+        max_try: max number of retries
 
     Returns:
-        文本生成器
+        text generator
     """
     if not hasattr(thread_local, 'generator'):
         thread_local.generator = GeminiAPIGenerator(
@@ -111,7 +111,7 @@ def get_or_create_generator(
 
 
 def load_json(json_path: Path) -> List[dict]:
-    """加载json文件（list格式）"""
+    """Load JSON file (list format)"""
     if not json_path.exists():
         return []
     try:
@@ -119,12 +119,12 @@ def load_json(json_path: Path) -> List[dict]:
             data = json.load(f)
             return data if isinstance(data, list) else []
     except Exception as e:
-        print(f"警告: 加载文件失败 {json_path}: {e}")
+        print(f"Warning: failed to load file {json_path}: {e}")
         return []
 
 
 def load_jsonl(jsonl_path: Path) -> List[dict]:
-    """加载jsonl文件（兼容旧格式）"""
+    """Load jsonl file (compatible with old format)"""
     samples = []
     if not jsonl_path.exists():
         return samples
@@ -143,7 +143,7 @@ def load_jsonl(jsonl_path: Path) -> List[dict]:
 
 
 def load_split_data(split_dir: Path, split_type: str) -> List[Dict]:
-    """从split目录加载数据"""
+    """Load data from split directory"""
     all_samples = []
 
     json_file = split_dir / f"{split_type}.json"
@@ -171,7 +171,7 @@ def generate_summary(
     frames: List[Image.Image],
     text_generator: GeminiAPIGenerator,
 ) -> Optional[Tuple[str, float]]:
-    """使用gemini生成summary和时序信息评分"""
+    """Generate summary and temporal score using Gemini"""
     prompt = """You are given a sequence of video frames. Please complete the following two tasks:
 
 1. Write a concise summary describing what happens in this video sequence. The summary should be clear and descriptive, focusing on the main actions and events shown in the frames. The summary must be less than 50 words.
@@ -218,12 +218,12 @@ Please respond with a JSON object containing "summary" and "temporal_score" fiel
 
         return (summary, temporal_score)
     except Exception as e:
-        print(f"生成summary失败: {e}")
+        print(f"Failed to generate summary: {e}")
         return None
 
 
 def build_prompt(summary: str, image_num: int) -> str:
-    """构建prompt"""
+    """Build prompt"""
     image_placeholders = ", ".join([f"<image {i+1}>" for i in range(image_num)])
     cleaned_summary = summary.strip()
 
@@ -252,7 +252,7 @@ def process_sample(
     generated_ids: Set[str],
     text_generator: GeminiAPIGenerator
 ) -> bool:
-    """处理单个样本"""
+    """Process a single sample"""
     yt_file = sample.get('yt_file', '')
     yt_line = sample.get('yt_line', -1)
     timestamps = sample.get('timestamps', [])
@@ -268,7 +268,7 @@ def process_sample(
         else:
             timestamps = timestamps[:11]
 
-    # 生成唯一ID
+    # Generate unique ID
     from utils.common import SAVE_ORIGINAL_STRING
     unique_id_result = generate_unique_id(
         "temporal",
@@ -284,7 +284,7 @@ def process_sample(
             return False
         generated_ids.add(unique_id)
 
-    # 获取视频路径
+    # Get video path
     video_path_str = sample.get('video_path')
     if video_path_str:
         video_path = Path(video_path_str)
@@ -297,7 +297,7 @@ def process_sample(
             generated_ids.discard(unique_id)
         return False
 
-    # 提取帧
+    # Extract frames
     try:
         vr = VideoReader(str(video_path), ctx=cpu(0))
         video_length = len(vr)
@@ -320,7 +320,7 @@ def process_sample(
             generated_ids.discard(unique_id)
         return False
 
-    # 生成summary和temporal_score
+    # Generate summary and temporal_score
     result = generate_summary(frames, text_generator)
     if not result:
         with unique_id_lock:
@@ -384,7 +384,7 @@ def worker_task(
     max_try: int,
     generated_ids: Set[str]
 ) -> bool:
-    """工作线程任务"""
+    """Worker thread task"""
     if stop_event.is_set():
         return False
 
@@ -403,14 +403,14 @@ def process_split_data(
     target_count: int,
     generated_ids: Set[str]
 ) -> None:
-    """处理split数据并生成最终数据"""
+    """Process split data and generate final data"""
     samples = load_split_data(split_dir, split_type)
 
     filtered_samples = [
         s for s in samples
         if get_image_count_category(s.get('image_num', 0)) == image_count_category
     ]
-    print(f"找到 {len(filtered_samples)} 个符合 {image_count_category} 的样本")
+    print(f"Found {len(filtered_samples)} samples matching {image_count_category}")
 
     random.seed(RANDOM_SEED)
     random.shuffle(filtered_samples)
@@ -452,7 +452,7 @@ def process_split_data(
                                         stop_event.set()
                                         break
                             except Exception as e:
-                                print(f"任务执行异常: {e}")
+                                print(f"Task execution exception: {e}")
                             done_futures.append(future)
 
                     for f in done_futures:
@@ -481,42 +481,42 @@ def process_split_data(
                             completed_count += 1
                             pbar.update(1)
                     except Exception as e:
-                        print(f"任务执行异常: {e}")
+                        print(f"Task execution exception: {e}")
 
     except KeyboardInterrupt:
-        print("\n收到中断信号，正在停止...")
+        print("\nInterrupt signal received, stopping...")
         stop_event.set()
         raise
 
-    print(f"\n{split_type}/{image_count_category} 完成: {completed_count}/{target_count}")
+    print(f"\n{split_type}/{image_count_category} done: {completed_count}/{target_count}")
 
 
 def main():
-    """主函数"""
+    """Main function"""
     print("=" * 80)
-    print("Temporal数据生成脚本")
+    print("Temporal data generation script")
     print("=" * 80)
-    print(f"Split目录: {SPLIT_DIR}")
-    print(f"Final目录: {FINAL_DIR}")
-    print(f"生成配置: {GEN_CONFIG}")
+    print(f"Split directory: {SPLIT_DIR}")
+    print(f"Final directory: {FINAL_DIR}")
+    print(f"Generation config: {GEN_CONFIG}")
     print("=" * 80)
 
     if not GEMINI_API_KEY:
-        print("警告: GEMINI_API_KEY 未设置，请通过环境变量设置")
+        print("Warning: GEMINI_API_KEY is not set, please set it via environment variable")
     if not GEMINI_API_URL:
-        print("警告: GEMINI_API_URL 未设置，请通过环境变量设置")
+        print("Warning: GEMINI_API_URL is not set, please set it via environment variable")
 
     FINAL_DIR.mkdir(parents=True, exist_ok=True)
 
     for split_type in ["train", "eval"]:
-        print(f"\n处理 {split_type} 数据...")
+        print(f"\nProcessing {split_type} data...")
         for image_count_category, config in GEN_CONFIG.items():
             target_count = config.get(split_type, 0)
             if target_count <= 0:
-                print(f"跳过 {split_type}/{image_count_category}")
+                print(f"Skipping {split_type}/{image_count_category}")
                 continue
             generated_ids = load_generated_ids(FINAL_DIR, split_type, image_count_category)
-            print(f"已加载 {len(generated_ids)} 个已生成的样本ID")
+            print(f"Loaded {len(generated_ids)} already-generated sample IDs")
             process_split_data(
                 split_dir=SPLIT_DIR,
                 final_dir=FINAL_DIR,
@@ -526,7 +526,7 @@ def main():
                 generated_ids=generated_ids
             )
 
-    print("\n处理完成！")
+    print("\nProcessing complete!")
 
 
 if __name__ == "__main__":

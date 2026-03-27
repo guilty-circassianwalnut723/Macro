@@ -29,7 +29,7 @@ for annotator_id in annotator_ids:
     control_image.save(f"{annotator.processor_id}.png")
 
     control_prompt = "Context_Control. "
-    prompt = f"{control_prompt}一个穿着淡蓝色的漂亮女孩正在翩翩起舞，背景是梦幻的星空，光影交错，细节精致。"
-    negative_prompt = "网格化，规则的网格，模糊, 低分辨率, 低质量, 变形, 畸形, 错误的解剖学, 变形的手, 变形的身体, 变形的脸, 变形的头发, 变形的眼睛, 变形的嘴巴"
+    prompt = f"{control_prompt}A beautiful girl wearing light blue is dancing gracefully, against a backdrop of a dreamy starry sky, with intertwining light and shadow, exquisite details."
+    negative_prompt = "grid pattern, regular grid, blurry, low resolution, low quality, deformed, distorted, incorrect anatomy, deformed hands, deformed body, deformed face, deformed hair, deformed eyes, deformed mouth"
     image = pipe(prompt, seed=1, negative_prompt=negative_prompt, context_image=control_image, height=1024, width=1024)
     image.save(f"image_{annotator.processor_id}.png")

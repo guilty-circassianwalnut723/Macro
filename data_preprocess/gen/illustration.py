@@ -1,13 +1,13 @@
 import os
 #!/usr/bin/env python3
 """
-Illustration数据生成脚本
+Illustration data generation script
 
-功能：
-1. 从split/illustration目录读取train数据（仅处理train数据）
-2. 使用gemini-3-pro-preview重写文本
-3. 保存到final/illustration/{train}/{image_count_category}/data和json目录
-4. 支持唯一识别编号，避免重复生成
+Features:
+1. Read train data from split/illustration directory (train data only)
+2. Rewrite text using gemini-3-pro-preview
+3. Save to final/illustration/{train}/{image_count_category}/data and json directories
+4. Support unique IDs to avoid duplicate generation
 """
 
 import json
@@ -22,7 +22,7 @@ from tqdm import tqdm
 from PIL import Image
 from dataclasses import dataclass
 
-# 添加utils路径
+# Add utils path
 CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(CURRENT_DIR))
 
@@ -33,23 +33,23 @@ from utils.common import (
     generate_unique_id
 )
 
-# 确保项目根目录在路径中
+# Ensure project root is in sys.path
 MACRO_DIR = CURRENT_DIR.parent.parent
 if str(MACRO_DIR) not in sys.path:
     sys.path.insert(0, str(MACRO_DIR))
 
 from api_generator.text_generator.gemini_api import GeminiAPIGenerator
 
-# ====== 配置参数 ======
-# 原始图文数据所在目录（包含conversation信息的原始数据，用于构建上下文）
+# ====== Configuration parameters ======
+# Directory of raw image-text data (contains conversation info, used to build context)
 DATA_DIR = MACRO_DIR / "data"  # Source data directory
 SPLIT_DIR = DATA_DIR / "split" / "illustration"
 FINAL_DIR = DATA_DIR / "final" / "illustration"
-# Gemini API 配置
+# Gemini API configuration
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_MODEL_NAME = "gemini-3-pro-preview"
 
-# 生成配置：{image_count_category: {train: count, eval: count}}
+# Generation config: {image_count_category: {train: count, eval: count}}
 GEN_CONFIG = {
     "1-3": {"train": 30000, "eval": 500},
     "4-5": {"train": 30000, "eval": 500},
@@ -57,21 +57,21 @@ GEN_CONFIG = {
     ">=8": {"train": 47500, "eval": 500}, # 10000
 }
 
-# 线程配置
+# Thread configuration
 MAX_WORKERS = 64
 MAX_TRIES = 3
 
-# 随机种子配置
+# Random seed configuration
 RANDOM_SEED = 42
 
-# 日志配置
-LOG_TO_SHELL = False  # 是否输出日志到shell
+# Logging configuration
+LOG_TO_SHELL = False  # Whether to output logs to shell
 
-# 占位符token
+# Placeholder token
 PLACEHOLDER_TOKEN = "<IMAGE_TOKEN>"
 REWRITE_TOKEN = "<IMAGE TOKEN>"
 
-# Prompt模板
+# Prompt template
 PROMPT_TEMPLATE = """
 You are an expert evaluator of multimodal sequences. You will review a sequence of interleaved text and images that naturally leads to a final target image.
 
@@ -137,24 +137,24 @@ RESPONSE_FORMAT = {
 }
 # ======================
 
-# ====== 线程局部存储 ======
+# ====== Thread-local storage ======
 thread_local = threading.local()
 
-# ====== 唯一ID检查锁 ======
+# ====== Unique ID check lock ======
 unique_id_lock = threading.Lock()
 # =============================
 
 
 @dataclass
 class SequenceEntry:
-    """序列条目"""
+    """Sequence entry"""
     entry_type: str  # "text" or "image"
     content: Optional[str] = None
     image_idx: Optional[int] = None
     image_path: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
-        """转换为字典"""
+        """Convert to dict"""
         result = {"type": self.entry_type}
         if self.entry_type == "text":
             result["content"] = self.content
@@ -166,7 +166,7 @@ class SequenceEntry:
 
 @dataclass
 class SampleContext:
-    """样本上下文"""
+    """Sample context"""
     text_content: str
     image_paths: List[str]
     sequence: List[SequenceEntry]
@@ -174,12 +174,12 @@ class SampleContext:
 
     @property
     def image_count(self) -> int:
-        """图像数量"""
+        """Image count"""
         return len(self.image_paths)
 
     @property
     def context_image_count(self) -> int:
-        """上下文图像数量"""
+        """Context image count"""
         return len(self.image_paths) - 1 if len(self.image_paths) > 0 else 0
 
 
@@ -189,15 +189,15 @@ def get_or_create_generator(
     max_try: int
 ) -> GeminiAPIGenerator:
     """
-    获取或创建线程局部生成器
+    Get or create thread-local generator
     
     Args:
-        gemini_api_key: Gemini API密钥
-        gemini_model_name: Gemini模型名称
-        max_try: 最大重试次数
+        gemini_api_key: Gemini API key
+        gemini_model_name: Gemini model name
+        max_try: max number of retries
     
     Returns:
-        文本生成器
+        text generator
     """
     if not hasattr(thread_local, 'generator'):
         thread_local.generator = GeminiAPIGenerator(
@@ -211,18 +211,18 @@ def get_or_create_generator(
 
 def load_split_data(split_dir: Path, split_type: str) -> List[Dict]:
     """
-    从split目录加载数据
+    Load data from split directory
     
     Args:
-        split_dir: split目录
-        split_type: "train" 或 "eval"
+        split_dir: split directory
+        split_type: "train" or "eval"
     
     Returns:
-        样本列表
+        list of samples
     """
     all_samples = []
     
-    # 尝试加载单个json文件
+    # Try to load a single JSON file
     json_file = split_dir / f"{split_type}.json"
     if json_file.exists():
         try:
@@ -231,9 +231,9 @@ def load_split_data(split_dir: Path, split_type: str) -> List[Dict]:
                 if isinstance(data, list):
                     return data
         except Exception as e:
-            print(f"警告: 加载文件失败 {json_file}: {e}")
+            print(f"Warning: failed to load file {json_file}: {e}")
     
-    # 尝试加载多个json文件（如果数据被拆分）
+    # Try to load multiple JSON files (if data is split)
     json_files = sorted(split_dir.glob(f"{split_type}_*.json"))
     if json_files:
         for json_file in json_files:
@@ -243,12 +243,12 @@ def load_split_data(split_dir: Path, split_type: str) -> List[Dict]:
                     if isinstance(data, list):
                         all_samples.extend(data)
             except Exception as e:
-                print(f"警告: 加载文件失败 {json_file}: {e}")
+                print(f"Warning: failed to load file {json_file}: {e}")
                 continue
         if all_samples:
             return all_samples
     
-    # 兼容旧格式：尝试加载jsonl文件
+    # Compatibility with old format: try to load jsonl files
     jsonl_file = split_dir / f"{split_type}.jsonl"
     if jsonl_file.exists():
         try:
@@ -265,7 +265,7 @@ def load_split_data(split_dir: Path, split_type: str) -> List[Dict]:
             if all_samples:
                 return all_samples
         except Exception as e:
-            print(f"警告: 加载文件失败 {jsonl_file}: {e}")
+            print(f"Warning: failed to load file {jsonl_file}: {e}")
     
     jsonl_files = sorted(split_dir.glob(f"{split_type}_*.jsonl"))
     if jsonl_files:
@@ -282,12 +282,12 @@ def load_split_data(split_dir: Path, split_type: str) -> List[Dict]:
                         except json.JSONDecodeError:
                             continue
             except Exception as e:
-                print(f"警告: 加载文件失败 {jsonl_file}: {e}")
+                print(f"Warning: failed to load file {jsonl_file}: {e}")
                 continue
         if all_samples:
             return all_samples
     
-    # 兼容旧格式：尝试加载JSON文件（带前缀的）
+    # Compatibility with old format: try to load prefixed JSON files
     for json_file in split_dir.glob(f"{split_type}_*.json"):
         try:
             with open(json_file, 'r', encoding='utf-8') as f:
@@ -295,7 +295,7 @@ def load_split_data(split_dir: Path, split_type: str) -> List[Dict]:
                 if isinstance(data, list):
                     all_samples.extend(data)
         except Exception as e:
-            print(f"警告: 加载文件失败 {json_file}: {e}")
+            print(f"Warning: failed to load file {json_file}: {e}")
             continue
     
     return all_samples
@@ -303,24 +303,24 @@ def load_split_data(split_dir: Path, split_type: str) -> List[Dict]:
 
 def load_original_sample(data_dir: Path, source_file: str, source_line: int) -> Optional[Dict[str, Any]]:
     """
-    从原始数据文件中加载样本
+    Load a sample from the original data file
     
     Args:
-        data_dir: 数据目录
-        source_file: 源文件路径
-        source_line: 源文件行号
+        data_dir: data directory
+        source_file: source file path
+        source_line: source file line number
     
     Returns:
-        样本数据或None
+        sample data or None
     """
     file_path = data_dir / source_file if not Path(source_file).is_absolute() else Path(source_file)
     if LOG_TO_SHELL:
-        print(f"    [加载原始样本] 尝试加载: data_dir={data_dir}, source_file={source_file}, source_line={source_line}")
-        print(f"    [加载原始样本] 完整路径: {file_path}")
+        print(f"    [load original sample] Attempting to load: data_dir={data_dir}, source_file={source_file}, source_line={source_line}")
+        print(f"    [load original sample] Full path: {file_path}")
     
     if not file_path.exists():
         if LOG_TO_SHELL:
-            print(f"    [加载原始样本] 文件不存在: {file_path}")
+            print(f"    [load original sample] File not found: {file_path}")
         return None
     
     try:
@@ -330,48 +330,48 @@ def load_original_sample(data_dir: Path, source_file: str, source_line: int) -> 
                     line = line.strip()
                     if not line:
                         if LOG_TO_SHELL:
-                            print(f"    [加载原始样本] 第{source_line}行为空")
+                            print(f"    [load original sample] Line {source_line} is empty")
                         return None
                     sample = json.loads(line)
                     if LOG_TO_SHELL:
-                        print(f"    [加载原始样本] 成功加载第{source_line}行")
+                        print(f"    [load original sample] Successfully loaded line {source_line}")
                         phrases = sample.get('phrases', [])
-                        print(f"    [加载原始样本] 样本包含{len(phrases)}个phrases")
+                        print(f"    [load original sample] Sample contains {len(phrases)} phrases")
                     return sample
         if LOG_TO_SHELL:
-            print(f"    [加载原始样本] 文件行数不足，找不到第{source_line}行")
+            print(f"    [load original sample] File has too few lines, cannot find line {source_line}")
     except Exception as e:
         if LOG_TO_SHELL:
-            print(f"    [加载原始样本] 加载失败: {e}")
+            print(f"    [load original sample] Load failed: {e}")
         return None
     return None
 
 
 def extract_phrases(sample: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
-    提取phrases列表（参考gen.py的实现）
+    Extract phrases list (see gen.py implementation for reference)
     
     Args:
-        sample: 样本数据
+        sample: sample data
     
     Returns:
-        phrases列表
+        list of phrases
     """
     phrases: List[Dict[str, Any]] = []
     
-    # 首先尝试直接从phrases字段获取
+    # First try to get directly from the phrases field
     direct_phrases = sample.get('phrases', [])
     if isinstance(direct_phrases, list):
         phrases.extend(direct_phrases)
         if LOG_TO_SHELL:
-            print(f"    [提取phrases] 从phrases字段提取: {len(phrases)}")
+            print(f"    [extract phrases] Extracted from phrases field: {len(phrases)}")
     
-    # 从conversation中提取phrases（参考gen.py的实现）
+    # Extract phrases from conversation (see gen.py implementation)
     conversations = sample.get("conversation", [])
     if isinstance(conversations, dict):
         conversations = conversations.get("phrases", [])
     if LOG_TO_SHELL:
-        print(f"    [提取phrases] conversations类型: {type(conversations)}, 长度: {len(conversations) if isinstance(conversations, list) else 'N/A'}")
+        print(f"    [extract phrases] conversations type: {type(conversations)}, length: {len(conversations) if isinstance(conversations, list) else 'N/A'}")
     
     for convo in conversations:
         if not isinstance(convo, dict):
@@ -380,10 +380,10 @@ def extract_phrases(sample: Dict[str, Any]) -> List[Dict[str, Any]]:
         if isinstance(convo_phrases, list):
             phrases.extend(convo_phrases)
             if LOG_TO_SHELL:
-                print(f"    [提取phrases] 从conversation中提取: +{len(convo_phrases)}")
+                print(f"    [extract phrases] Extracted from conversation: +{len(convo_phrases)}")
     
     if LOG_TO_SHELL:
-        print(f"    [提取phrases] 总计提取: {len(phrases)}")
+        print(f"    [extract phrases] Total extracted: {len(phrases)}")
     
     return phrases
 
@@ -394,19 +394,19 @@ def resolve_image_path(
     data_dir: Optional[Path],
 ) -> Optional[Path]:
     """
-    解析图像路径（参考gen.py的实现）
+    Resolve image path (see gen.py implementation for reference)
     
     Args:
-        image_info: 图像信息
-        image_root: 图像根目录
-        data_dir: 数据目录
+        image_info: image information
+        image_root: image root directory
+        data_dir: data directory
     
     Returns:
-        解析后的图像路径或None
+        resolved image path or None
     """
     candidate_paths: List[Path] = []
     
-    # 尝试从image字段获取路径（参考gen.py的实现）
+    # Try to get path from image field (see gen.py implementation)
     raw_path = image_info.get("image")
     if isinstance(raw_path, str) and raw_path.strip():
         path = Path(raw_path)
@@ -419,7 +419,7 @@ def resolve_image_path(
                 candidate_paths.append(data_dir / raw_path)
             candidate_paths.append(path)
     
-    # 尝试从img_path字段获取路径（参考gen.py的实现）
+    # Try to get path from img_path field (see gen.py implementation)
     relative_path = image_info.get("img_path")
     if isinstance(relative_path, str) and relative_path.strip():
         if image_root:
@@ -428,7 +428,7 @@ def resolve_image_path(
             candidate_paths.append(data_dir / relative_path)
         candidate_paths.append(Path(relative_path))
     
-    # 兼容旧格式：尝试从path或filepath字段获取路径
+    # Compatibility with old format: try path or filepath fields
     path_str = image_info.get('path', '') or image_info.get('filepath', '')
     if path_str:
         path = Path(path_str)
@@ -442,48 +442,48 @@ def resolve_image_path(
             candidate_paths.append(path)
     
     if LOG_TO_SHELL:
-        print(f"    [解析路径] 图像信息: {image_info}")
-        print(f"    [解析路径] 候选路径数量: {len(candidate_paths)}")
+        print(f"    [resolve path] Image info: {image_info}")
+        print(f"    [resolve path] Number of candidate paths: {len(candidate_paths)}")
     
-    # 尝试每个候选路径
+    # Try each candidate path
     for candidate in candidate_paths:
         if candidate.exists():
             if LOG_TO_SHELL:
-                print(f"    [解析路径] 找到有效路径: {candidate}")
+                print(f"    [resolve path] Found valid path: {candidate}")
             return candidate
         elif LOG_TO_SHELL:
-            print(f"    [解析路径] 路径不存在: {candidate}")
+            print(f"    [resolve path] Path does not exist: {candidate}")
     
-    # 如果所有路径都不存在，返回第一个候选路径（如果存在）或None
+    # If all paths are missing, return the first candidate (if any) or None
     if candidate_paths:
         if LOG_TO_SHELL:
-            print(f"    [解析路径] 所有路径都不存在，返回第一个候选路径: {candidate_paths[0]}")
+            print(f"    [resolve path] All paths missing, returning first candidate: {candidate_paths[0]}")
         return candidate_paths[0]
     
     if LOG_TO_SHELL:
-        print(f"    [解析路径] 无法解析路径，返回None")
+        print(f"    [resolve path] Cannot resolve path, returning None")
     return None
 
 
 def get_image_count_from_sample(sample: Dict[str, Any]) -> Optional[int]:
     """
-    从split数据中获取图像数量
+    Get image count from split data sample
     
     Args:
-        sample: split数据样本
+        sample: split data sample
     
     Returns:
-        图像数量或None（总图像数量，包括目标图像）
+        image count or None (total image count including target image)
     """
     if LOG_TO_SHELL:
-        print(f"    [获取图像数量] 开始获取图像数量")
-        print(f"    [获取图像数量] sample中的image_count: {sample.get('image_count')}")
-        print(f"    [获取图像数量] sample中的actual_image_count: {sample.get('actual_image_count')}")
+        print(f"    [get image count] Starting to get image count")
+        print(f"    [get image count] sample image_count: {sample.get('image_count')}")
+        print(f"    [get image count] sample actual_image_count: {sample.get('actual_image_count')}")
     
-    # 直接从split数据中获取image_count（总图像数量，包括目标图像）
+    # Get image_count directly from split data (total count including target image)
     result = sample.get('image_count')
     if LOG_TO_SHELL:
-        print(f"    [获取图像数量] 从split数据获取image_count: {result}")
+        print(f"    [get image count] image_count from split data: {result}")
     return result
 
 
@@ -496,18 +496,18 @@ def build_sample_context(
     true_index: Optional[int] = None,
 ) -> SampleContext:
     """
-    构建样本上下文
+    Build sample context
     
     Args:
-        sample: 样本数据
-        original_sample: 原始样本数据
-        image_count: 实际使用的图像数量（包括目标图像）
-        data_dir: 数据目录
-        image_root: 图像根目录
-        true_index: true索引（0-based）
+        sample: sample data
+        original_sample: original sample data
+        image_count: actual number of images to use (including target image)
+        data_dir: data directory
+        image_root: image root directory
+        true_index: true index (0-based)
     
     Returns:
-        样本上下文
+        sample context
     """
     phrases = extract_phrases(original_sample)
     sequence = []
@@ -516,32 +516,32 @@ def build_sample_context(
     missing_images = []
     
     if LOG_TO_SHELL:
-        print(f"[构建上下文] 开始构建样本上下文")
-        print(f"  - 期望图像数量: {image_count}")
+        print(f"[build context] Starting to build sample context")
+        print(f"  - Expected image count: {image_count}")
         print(f"  - true_index: {true_index}")
-        print(f"  - phrases总数: {len(phrases)}")
+        print(f"  - Total phrases: {len(phrases)}")
         print(f"  - data_dir: {data_dir}")
         print(f"  - image_root: {image_root}")
     
-    # 参考gen.py的实现，按顺序处理phrases
-    context_image_paths: List[str] = []  # 上下文图像（不包括target image）
+    # See gen.py implementation, process phrases in order
+    context_image_paths: List[str] = []  # Context images (excluding target image)
     target_image_path: Optional[str] = None
     
-    # 如果提供了true_index，则只处理true_index之前的图像（不包括true_index本身，因为它是目标图像）
-    context_image_count = image_count - 1  # 上下文图像数量（不包括target image）
+    # If true_index is provided, process only images before true_index (not including it, as it is the target)
+    context_image_count = image_count - 1  # Number of context images (excluding target image)
     if true_index is not None:
         context_image_count = true_index
     
     if LOG_TO_SHELL:
-        print(f"  - 上下文图像数量: {context_image_count}")
+        print(f"  - Context image count: {context_image_count}")
     
-    # 收集上下文图像和target image（参考gen.py的实现，处理所有phrases，根据image_idx判断）
+    # Collect context images and target image (see gen.py, process all phrases by image_idx)
     image_idx = 0
     for phrase_idx, phrase in enumerate(phrases):
         if LOG_TO_SHELL:
-            print(f"  - 处理phrase[{phrase_idx}]: phrase结构={phrase}")
+            print(f"  - Processing phrase[{phrase_idx}]: phrase structure={phrase}")
         
-        # 处理文本（参考gen.py的实现）
+        # Process text (see gen.py implementation)
         text_info = phrase.get("text")
         if text_info:
             content = text_info.get("content") if isinstance(text_info, dict) else None
@@ -551,32 +551,32 @@ def build_sample_context(
                     text_parts.append(normalized)
                     sequence.append(SequenceEntry(entry_type='text', content=normalized))
                     if LOG_TO_SHELL:
-                        print(f"    -> 添加文本: {normalized[:50]}...")
+                        print(f"    -> Added text: {normalized[:50]}...")
         
-        # 处理图像（参考gen.py的实现）
+        # Process image (see gen.py implementation)
         image_info = phrase.get("image")
         if image_info:
             if LOG_TO_SHELL:
-                print(f"    -> 图像信息: {image_info}, 当前图像索引: {image_idx}")
+                print(f"    -> Image info: {image_info}, current image index: {image_idx}")
             
             resolved = resolve_image_path(image_info, image_root, data_dir)
             if resolved is None:
                 missing_images.append(str(image_info))
                 image_idx += 1
                 if LOG_TO_SHELL:
-                    print(f"    -> 图像解析失败: {image_info}")
+                    print(f"    -> Image resolution failed: {image_info}")
                 continue
             resolved = resolved.resolve()
             if not resolved.exists():
                 missing_images.append(str(resolved))
                 image_idx += 1
                 if LOG_TO_SHELL:
-                    print(f"    -> 图像文件不存在: {resolved}")
+                    print(f"    -> Image file not found: {resolved}")
                 continue
             
-            # 根据图像索引判断是上下文图像还是目标图像（参考gen.py的实现）
+            # Determine whether context or target image based on image index (see gen.py)
             if image_idx < context_image_count:
-                # 上下文图像
+                # Context image
                 context_image_paths.append(str(resolved))
                 text_parts.append(PLACEHOLDER_TOKEN)
                 sequence.append(SequenceEntry(
@@ -585,16 +585,16 @@ def build_sample_context(
                     image_path=str(resolved)
                 ))
                 if LOG_TO_SHELL:
-                    print(f"    -> 添加上下文图像: {resolved}, image_idx={image_idx}")
+                    print(f"    -> Added context image: {resolved}, image_idx={image_idx}")
             elif (true_index is not None and image_idx == true_index) or (true_index is None and image_idx == image_count - 1):
-                # target image（暂时保存，循环后添加）
+                # Target image (temporarily saved, added after the loop)
                 target_image_path = str(resolved)
                 if LOG_TO_SHELL:
-                    print(f"    -> 找到目标图像: {resolved}, image_idx={image_idx}")
+                    print(f"    -> Found target image: {resolved}, image_idx={image_idx}")
             
             image_idx += 1
     
-    # 构建最终的image_paths：上下文图像 + target image（用于传递给LLM）（参考gen.py的实现）
+    # Build final image_paths: context images + target image (for LLM) (see gen.py)
     image_paths = context_image_paths.copy()
     if target_image_path:
         image_paths.append(target_image_path)
@@ -605,24 +605,24 @@ def build_sample_context(
             image_path=target_image_path
         ))
         if LOG_TO_SHELL:
-            print(f"    -> 添加目标图像到最终列表: {target_image_path}")
+            print(f"    -> Added target image to final list: {target_image_path}")
     
-    # 验证PLACEHOLDER_TOKEN数量（参考gen.py的实现）
+    # Verify PLACEHOLDER_TOKEN count (see gen.py implementation)
     placeholder_token_count = len([item for item in text_parts if item == PLACEHOLDER_TOKEN])
     if LOG_TO_SHELL:
-        print(f"    -> PLACEHOLDER_TOKEN数量: {placeholder_token_count}, 期望: {image_count}")
+        print(f"    -> PLACEHOLDER_TOKEN count: {placeholder_token_count}, expected: {image_count}")
     if placeholder_token_count != image_count:
         if LOG_TO_SHELL:
-            print(f"    [错误] PLACEHOLDER_TOKEN数量不正确: {placeholder_token_count} != {image_count}")
+            print(f"    [error] PLACEHOLDER_TOKEN count incorrect: {placeholder_token_count} != {image_count}")
     
     text_content = ' '.join(text_parts)
     
     if LOG_TO_SHELL:
-        print(f"[构建上下文] 完成")
-        print(f"  - 实际找到图像数量: {len(image_paths)}")
-        print(f"  - 缺失图像数量: {len(missing_images)}")
-        print(f"  - 文本片段数量: {len(text_parts)}")
-        print(f"  - 序列条目数量: {len(sequence)}")
+        print(f"[build context] Done")
+        print(f"  - Actual images found: {len(image_paths)}")
+        print(f"  - Missing images: {len(missing_images)}")
+        print(f"  - Text segments: {len(text_parts)}")
+        print(f"  - Sequence entries: {len(sequence)}")
     
     return SampleContext(
         text_content=text_content,
@@ -634,61 +634,61 @@ def build_sample_context(
 
 def ensure_sequence_valid(context: SampleContext, expected_count: int) -> Tuple[bool, Optional[str]]:
     """
-    确保序列有效
+    Validate that the sequence is valid
     
     Args:
-        context: 样本上下文
-        expected_count: 期望的图像数量
+        context: sample context
+        expected_count: expected image count
     
     Returns:
         (is_valid, error_message)
     """
     if LOG_TO_SHELL:
-        print(f"    [验证序列] 开始验证")
-        print(f"      - 期望图像数量: {expected_count}")
-        print(f"      - 实际图像数量: {context.image_count}")
-        print(f"      - 图像路径列表: {context.image_paths}")
-        print(f"      - 缺失图像: {context.missing_images}")
-        print(f"      - 序列条目数: {len(context.sequence)}")
+        print(f"    [validate sequence] Starting validation")
+        print(f"      - Expected image count: {expected_count}")
+        print(f"      - Actual image count: {context.image_count}")
+        print(f"      - Image path list: {context.image_paths}")
+        print(f"      - Missing images: {context.missing_images}")
+        print(f"      - Sequence entry count: {len(context.sequence)}")
     
     if context.image_count != expected_count:
-        error_msg = f"图像数量不匹配: 期望 {expected_count}, 实际 {context.image_count}"
+        error_msg = f"Image count mismatch: expected {expected_count}, actual {context.image_count}"
         if LOG_TO_SHELL:
-            print(f"    [验证序列] 验证失败: {error_msg}")
-            print(f"      - 详细分析:")
-            print(f"        * 图像路径列表长度: {len(context.image_paths)}")
-            print(f"        * 每个图像路径存在性: {[(p, Path(p).exists()) for p in context.image_paths]}")
+            print(f"    [validate sequence] Validation failed: {error_msg}")
+            print(f"      - Detailed analysis:")
+            print(f"        * Image path list length: {len(context.image_paths)}")
+            print(f"        * Existence of each image path: {[(p, Path(p).exists()) for p in context.image_paths]}")
         return False, error_msg
     
     if context.missing_images:
-        error_msg = f"缺失图像: {len(context.missing_images)} 个"
+        error_msg = f"Missing images: {len(context.missing_images)}"
         if LOG_TO_SHELL:
-            print(f"    [验证序列] 验证失败: {error_msg}")
-            print(f"      - 缺失图像详情: {context.missing_images}")
+            print(f"    [validate sequence] Validation failed: {error_msg}")
+            print(f"      - Missing image details: {context.missing_images}")
         return False, error_msg
     
     for img_path in context.image_paths:
         if not Path(img_path).exists():
-            error_msg = f"图像文件不存在: {img_path}"
+            error_msg = f"Image file not found: {img_path}"
             if LOG_TO_SHELL:
-                print(f"    [验证序列] 验证失败: {error_msg}")
+                print(f"    [validate sequence] Validation failed: {error_msg}")
             return False, error_msg
     
     if LOG_TO_SHELL:
-        print(f"    [验证序列] 验证通过")
+        print(f"    [validate sequence] Validation passed")
     return True, None
 
 
 def build_prompt(sample: Dict[str, Any], context: SampleContext) -> str:
     """
-    构建prompt
+    Build prompt
     
     Args:
-        sample: 样本数据
-        context: 样本上下文
+        sample: sample data
+        context: sample context
     
     Returns:
-        prompt字符串
+        prompt string
     """
     content_parts = []
     for entry in context.sequence:
@@ -711,14 +711,14 @@ def build_prompt(sample: Dict[str, Any], context: SampleContext) -> str:
 
 def normalize_bool_list(values: List[Any], expected_len: int) -> List[bool]:
     """
-    规范化布尔列表
+    Normalize boolean list
     
     Args:
-        values: 值列表
-        expected_len: 期望长度
+        values: list of values
+        expected_len: expected length
     
     Returns:
-        规范化后的布尔列表
+        normalized boolean list
     """
     if not isinstance(values, list):
         return [True] * expected_len
@@ -740,15 +740,15 @@ def normalize_bool_list(values: List[Any], expected_len: int) -> List[bool]:
 
 def normalize_int(value: Any, min_value: int = 1, max_value: int = 10) -> int:
     """
-    规范化整数
+    Normalize integer
     
     Args:
-        value: 值
-        min_value: 最小值
-        max_value: 最大值
+        value: value
+        min_value: minimum value
+        max_value: maximum value
     
     Returns:
-        规范化后的整数
+        normalized integer
     """
     try:
         if isinstance(value, (int, float)):
@@ -761,15 +761,15 @@ def normalize_int(value: Any, min_value: int = 1, max_value: int = 10) -> int:
 
 
 def validate_rewritten_text(rewritten: Optional[str], required_token_count: int) -> Optional[str]:
-    """验证重写文本中的 REWRITE_TOKEN 数量
+    """Validate the number of REWRITE_TOKEN occurrences in rewritten text
     
     Args:
-        rewritten: 重写的文本
-        required_token_count: 贡献的上下文图像数量（不包括目标图像）
+        rewritten: rewritten text
+        required_token_count: number of contributing context images (excluding target image)
     
     Returns:
-        验证后的文本，如果token数量比contributing_count多1且最后一个token在末尾，则去掉最后一个token
-        如果token数量不符合要求，返回None
+        validated text; if token count is contributing_count+1 and the last token is at the end, strip it;
+        returns None if token count does not meet requirements
     """
     if required_token_count <= 0:
         if rewritten is None:
@@ -779,7 +779,7 @@ def validate_rewritten_text(rewritten: Optional[str], required_token_count: int)
             return None
         token_count_zero = stripped_zero.count(REWRITE_TOKEN)
         if token_count_zero != 0:
-            return None  # 无贡献图片时不应有token
+            return None  # No tokens should appear when there are no contributing images
         return stripped_zero
 
     if rewritten is None:
@@ -792,31 +792,31 @@ def validate_rewritten_text(rewritten: Optional[str], required_token_count: int)
     
     token_count = stripped.count(REWRITE_TOKEN)
     
-    # 判断token数量是否符合要求
+    # Check whether token count meets requirements
     if token_count == required_token_count:
-        # token数量正好等于贡献图像数量，正常返回
+        # Token count exactly equals contributing image count, return normally
         return stripped
     elif token_count == required_token_count + 1:
-        # token数量比贡献图像数量多1（包含了目标图像），需要检查最后一个token是否在末尾
-        # 使用rsplit从右往左分割一次，分隔符是REWRITE_TOKEN
+        # Token count is contributing count + 1 (includes target image), check if last token is at the end
+        # Use rsplit to split once from the right, separator is REWRITE_TOKEN
         parts = stripped.rsplit(REWRITE_TOKEN, 1)
         if len(parts) == 2:
-            # parts[0]是最后token之前的内容，parts[1]是最后token之后的内容
+            # parts[0] is content before the last token, parts[1] is content after the last token
             before_last_token = parts[0].rstrip()
             after_last_token = parts[1].strip()
             
-            # 检查最后一个token是否在末尾（即after_last_token应该为空或只有标点符号）
-            # 如果最后一个token后面还有实质性内容，则认为验证失败
+            # Check if last token is at the end (after_last_token should be empty or only punctuation)
+            # If there is substantial content after the last token, validation fails
             if after_last_token and not all(c in '.,;:!?\'"' for c in after_last_token):
-                # 最后一个token不在末尾，验证失败
+                # Last token is not at the end, validation fails
                 return None
             
-            # 去掉最后一个token
+            # Remove the last token
             return before_last_token.strip()
-        # 如果分割失败（理论上不应该发生），返回None
+        # If split fails (should not happen in theory), return None
         return None
     else:
-        # token数量不符合要求，返回None
+        # Token count does not meet requirements, return None
         return None
 
 
@@ -832,21 +832,21 @@ def process_sample(
     generated_ids: Set[str]
 ) -> bool:
     """
-    处理单个样本
+    Process a single sample
     
     Args:
-        sample: split数据样本
-        data_dir: 原始图文数据所在目录（包含conversation信息的原始数据，用于构建上下文）
-        image_root: 图像根目录
-        text_generator: 文本生成器
-        final_dir: final目录
-        split_type: "train" 或 "eval"
-        image_count_category: 图像数量类别
-        idx: 样本索引
-        generated_ids: 已生成的唯一ID集合
+        sample: split data sample
+        data_dir: directory of raw image-text data (contains conversation info, used for context)
+        image_root: image root directory
+        text_generator: text generator
+        final_dir: final directory
+        split_type: "train" or "eval"
+        image_count_category: image count category
+        idx: sample index
+        generated_ids: set of already-generated unique IDs
     
     Returns:
-        是否处理成功
+        whether processing succeeded
     """
     source_file = sample.get('source_file')
     source_line = sample.get('source_line')
@@ -855,8 +855,8 @@ def process_sample(
     if not source_file or source_line is None or true_index is None:
         return False
     
-    # 生成唯一ID
-    # 如果 SAVE_ORIGINAL_STRING=True，需要获取原始字符串以便保存
+    # Generate unique ID
+    # If SAVE_ORIGINAL_STRING=True, get the original string for saving
     from utils.common import SAVE_ORIGINAL_STRING
     unique_id_result = generate_unique_id("illustration",
                                          return_original=SAVE_ORIGINAL_STRING,
@@ -864,134 +864,134 @@ def process_sample(
                                          source_line=source_line,
                                          true_index=true_index)
     
-    # 提取用于检查的唯一ID（如果是元组，使用 MD5 哈希；如果是字符串，直接使用）
+    # Extract unique ID for checking (use MD5 hash if tuple, or use string directly)
     unique_id = unique_id_result[0] if isinstance(unique_id_result, tuple) else unique_id_result
     
-    # 检查 unique_id 是否已生成（线程安全）
+    # Check whether unique_id has already been generated (thread-safe)
     with unique_id_lock:
         if unique_id in generated_ids:
             return False
-        # 立即添加 unique_id，防止其他线程同时生成
+        # Add unique_id immediately to prevent other threads from generating the same
         generated_ids.add(unique_id)
     
-    # 加载原始样本（从原始图文数据目录加载，包含conversation信息）
+    # Load original sample (from raw image-text data directory, contains conversation info)
     if LOG_TO_SHELL:
-        print(f"[样本 {idx}] 开始处理")
+        print(f"[Sample {idx}] Starting processing")
         print(f"  - source_file: {source_file}")
         print(f"  - source_line: {source_line}")
         print(f"  - true_index: {true_index}")
-        print(f"  - data_dir: {data_dir} (用于加载原始图文数据)")
+        print(f"  - data_dir: {data_dir} (used for loading raw image-text data)")
     
     original_sample = load_original_sample(data_dir, source_file, source_line)
     if not original_sample:
         if LOG_TO_SHELL:
-            print(f"[样本 {idx}] 加载原始样本失败: data_dir={data_dir}, source_file={source_file}, source_line={source_line}")
-        # 移除 unique_id（如果添加了）
+            print(f"[Sample {idx}] Failed to load original sample: data_dir={data_dir}, source_file={source_file}, source_line={source_line}")
+        # Remove unique_id (if it was added)
         with unique_id_lock:
             generated_ids.discard(unique_id)
         return False
     
     if LOG_TO_SHELL:
-        print(f"[样本 {idx}] 成功加载原始样本")
+        print(f"[Sample {idx}] Successfully loaded original sample")
         phrases = extract_phrases(original_sample)
-        print(f"  - 原始样本phrases数量: {len(phrases)}")
-        for i, phrase in enumerate(phrases[:10]):  # 只打印前10个
+        print(f"  - Original sample phrase count: {len(phrases)}")
+        for i, phrase in enumerate(phrases[:10]):  # Only print first 10
             phrase_type = phrase.get('type', 'unknown')
             if not phrase_type:
-                # 尝试从text或image字段判断类型
+                # Try to determine type from text or image field
                 if phrase.get('text'):
                     phrase_type = 'text'
                 elif phrase.get('image'):
                     phrase_type = 'image'
             print(f"    phrases[{i}]: type={phrase_type}")
     
-    # 获取图像数量（从split数据获取）
+    # Get image count (from split data)
     image_count = get_image_count_from_sample(sample)
     if not image_count:
         if LOG_TO_SHELL:
-            print(f"[样本 {idx}] 无法获取图像数量")
-            print(f"  - sample中的image_count: {sample.get('image_count')}")
-            print(f"  - sample中的actual_image_count: {sample.get('actual_image_count')}")
-        # 移除 unique_id（如果添加了）
+            print(f"[Sample {idx}] Cannot get image count")
+            print(f"  - sample image_count: {sample.get('image_count')}")
+            print(f"  - sample actual_image_count: {sample.get('actual_image_count')}")
+        # Remove unique_id (if it was added)
         with unique_id_lock:
             generated_ids.discard(unique_id)
         return False
     
     if LOG_TO_SHELL:
-        print(f"[样本 {idx}] 图像数量: {image_count}")
+        print(f"[Sample {idx}] Image count: {image_count}")
     
-    # 构建样本上下文
+    # Build sample context
     context = build_sample_context(
         sample, original_sample, image_count, data_dir, image_root, true_index
     )
     
-    # 验证序列
+    # Validate sequence
     if LOG_TO_SHELL:
-        print(f"[样本 {idx}] 开始验证序列")
+        print(f"[Sample {idx}] Starting sequence validation")
         print(f"  - unique_id: {unique_id}")
         print(f"  - source_file: {source_file}")
         print(f"  - source_line: {source_line}")
         print(f"  - true_index: {true_index}")
-        print(f"  - 期望图像数量: {image_count}")
-        print(f"  - 实际图像数量: {context.image_count}")
-        print(f"  - 实际图像路径: {context.image_paths}")
-        print(f"  - 缺失图像: {context.missing_images}")
-        print(f"  - 序列条目: {len(context.sequence)}")
+        print(f"  - Expected image count: {image_count}")
+        print(f"  - Actual image count: {context.image_count}")
+        print(f"  - Actual image paths: {context.image_paths}")
+        print(f"  - Missing images: {context.missing_images}")
+        print(f"  - Sequence entries: {len(context.sequence)}")
     
     is_valid, error_msg = ensure_sequence_valid(context, image_count)
     if not is_valid:
         if LOG_TO_SHELL:
-            print(f"[样本 {idx}] 验证失败: {error_msg}")
-            print(f"  - 详细信息:")
-            print(f"    * 期望图像数量: {image_count}")
-            print(f"    * 实际图像数量: {context.image_count}")
-            print(f"    * 图像路径列表: {context.image_paths}")
-            print(f"    * 缺失图像: {context.missing_images}")
-            print(f"    * 序列条目: {[e.entry_type for e in context.sequence]}")
-        print(f"样本 {idx} 验证失败: {error_msg}")
-        # 移除 unique_id（如果添加了）
+            print(f"[Sample {idx}] Validation failed: {error_msg}")
+            print(f"  - Details:")
+            print(f"    * Expected image count: {image_count}")
+            print(f"    * Actual image count: {context.image_count}")
+            print(f"    * Image path list: {context.image_paths}")
+            print(f"    * Missing images: {context.missing_images}")
+            print(f"    * Sequence entries: {[e.entry_type for e in context.sequence]}")
+        print(f"Sample {idx} validation failed: {error_msg}")
+        # Remove unique_id (if it was added)
         with unique_id_lock:
             generated_ids.discard(unique_id)
         return False
     
     if LOG_TO_SHELL:
-        print(f"[样本 {idx}] 验证通过")
+        print(f"[Sample {idx}] Validation passed")
     
-    # 构建prompt
+    # Build prompt
     if LOG_TO_SHELL:
-        print(f"[样本 {idx}] 构建prompt")
+        print(f"[Sample {idx}] Building prompt")
     prompt = build_prompt(sample, context)
     
-    # 加载图像
+    # Load images
     if LOG_TO_SHELL:
-        print(f"[样本 {idx}] 开始加载图像，共{len(context.image_paths)}张")
+        print(f"[Sample {idx}] Loading {len(context.image_paths)} images")
     images = []
     for i, img_path in enumerate(context.image_paths):
         if LOG_TO_SHELL:
-            print(f"  - 加载图像[{i+1}/{len(context.image_paths)}]: {img_path}")
+            print(f"  - Loading image [{i+1}/{len(context.image_paths)}]: {img_path}")
         try:
             img_path_obj = Path(img_path)
             if not img_path_obj.exists():
                 if LOG_TO_SHELL:
-                    print(f"    [加载图像] 路径不存在: {img_path}")
-                raise FileNotFoundError(f"图像文件不存在: {img_path}")
+                    print(f"    [load image] Path not found: {img_path}")
+                raise FileNotFoundError(f"Image file not found: {img_path}")
             img = Image.open(img_path)
             images.append(img)
             if LOG_TO_SHELL:
-                print(f"    [加载图像] 成功加载: {img_path}, 尺寸={img.size}")
+                print(f"    [load image] Successfully loaded: {img_path}, size={img.size}")
         except Exception as e:
             if LOG_TO_SHELL:
-                print(f"    [加载图像] 加载失败: {img_path}, 错误={e}")
-            print(f"样本 {idx} 加载图像失败 {img_path}: {e}")
-            # 移除 unique_id（如果添加了）
+                print(f"    [load image] Load failed: {img_path}, error={e}")
+            print(f"Sample {idx} failed to load image {img_path}: {e}")
+            # Remove unique_id (if it was added)
             with unique_id_lock:
                 generated_ids.discard(unique_id)
             return False
     
     if LOG_TO_SHELL:
-        print(f"[样本 {idx}] 成功加载所有{len(images)}张图像")
+        print(f"[Sample {idx}] Successfully loaded all {len(images)} images")
     
-    # 调用LLM生成结果
+    # Call LLM to generate result
     try:
         response = text_generator.gen_response(
             prompt=prompt,
@@ -1006,38 +1006,38 @@ def process_sample(
             response.get('image_contributions', []),
             context.context_image_count
         )
-        # 计算贡献的上下文图像数量（不包括目标图像）
+        # Count contributing context images (excluding target image)
         contributing_count = sum(1 for flag in image_contributions if flag)
         rewritten_text = validate_rewritten_text(
             response.get('rewritten_text'),
-            contributing_count  # 只包括贡献的上下文图像数量，不包括目标图像
+            contributing_count  # Only contributing context images, excluding target image
         )
         guidance_score = normalize_int(response.get('guidance_score', 5))
         training_score = normalize_int(response.get('training_score', 5))
         reasoning = response.get('reasoning', '')
         
     except Exception as e:
-        print(f"样本 {idx} LLM调用失败: {e}")
-        # 移除 unique_id（如果添加了）
+        print(f"Sample {idx} LLM call failed: {e}")
+        # Remove unique_id (if it was added)
         with unique_id_lock:
             generated_ids.discard(unique_id)
         return False
     
-    # 验证重写文本是否有效（必须包含正确数量的 <IMAGE TOKEN>）
+    # Validate the rewritten text (must contain the correct number of <IMAGE TOKEN>)
     if rewritten_text is None:
         if LOG_TO_SHELL:
-            print(f"[样本 {idx}] 重写文本验证失败: token数量不匹配或格式错误")
-        # 移除 unique_id（如果添加了）
+            print(f"[Sample {idx}] Rewritten text validation failed: token count mismatch or format error")
+        # Remove unique_id (if it was added)
         with unique_id_lock:
             generated_ids.discard(unique_id)
         return False
     
-    # 构建最终文本（必须使用重写文本，不再使用原始文本作为备选）
+    # Build final text (must use rewritten text; original text is no longer a fallback)
     instruction = rewritten_text
     
-    # 将REWRITE_TOKEN（<IMAGE TOKEN>）转换为<image n>格式
-    # 按照顺序替换：第一个token替换为<image 1>，第二个替换为<image 2>，以此类推
-    # 只在有rewritten_text时进行转换（与参考文件保持一致）
+    # Convert REWRITE_TOKEN (<IMAGE TOKEN>) to <image n> format
+    # Replace in order: first token -> <image 1>, second -> <image 2>, etc.
+    # Only convert when rewritten_text exists (consistent with reference file)
     if rewritten_text and REWRITE_TOKEN in instruction:
         token_index = 1
         while REWRITE_TOKEN in instruction:
@@ -1046,7 +1046,7 @@ def process_sample(
     
     final_text = instruction
     
-    # 保存数据
+    # Save data
     json_data = {
         'source_file': source_file,
         'source_line': source_line,
@@ -1070,13 +1070,13 @@ def process_sample(
         split_type,
         image_count_category,
         idx,
-        unique_id_result,  # 可能是字符串或 (md5_hash, original_string) 元组
+        unique_id_result,  # May be a string or (md5_hash, original_string) tuple
         json_data,
         image_files
     )
     
     if not success:
-        # 移除 unique_id（如果保存失败）
+        # Remove unique_id (if saving failed)
         with unique_id_lock:
             generated_ids.discard(unique_id)
     
@@ -1098,34 +1098,34 @@ def worker_task(
     generated_ids: Set[str]
 ) -> bool:
     """
-    工作线程任务
+    Worker thread task
     
     Args:
-        idx: 样本索引
-        sample: split数据样本
-        data_dir: 原始图文数据所在目录（包含conversation信息的原始数据，用于构建上下文）
-        image_root: 图像根目录
-        final_dir: final目录
-        split_type: "train" 或 "eval"
-        image_count_category: 图像数量类别
-        stop_event: 停止事件
-        gemini_api_key: Gemini API密钥
-        gemini_model_name: Gemini模型名称
-        max_try: 最大重试次数
-        generated_ids: 已生成的唯一ID集合
+        idx: sample index
+        sample: split data sample
+        data_dir: directory of raw image-text data (contains conversation info, used for context)
+        image_root: image root directory
+        final_dir: final directory
+        split_type: "train" or "eval"
+        image_count_category: image count category
+        stop_event: stop event
+        gemini_api_key: Gemini API key
+        gemini_model_name: Gemini model name
+        max_try: max number of retries
+        generated_ids: set of already-generated unique IDs
     
     Returns:
-        是否处理成功
+        whether processing succeeded
     """
     if stop_event.is_set():
         return False
     
-    # 获取或创建线程局部生成器
+    # Get or create thread-local generator
     text_generator = get_or_create_generator(
         gemini_api_key, gemini_model_name, max_try
     )
     
-    # 处理样本
+    # Process sample
     result = process_sample(
         sample,
         data_dir,
@@ -1149,20 +1149,20 @@ def process_split_data(
     generated_ids: Set[str]
 ) -> None:
     """
-    处理split数据并生成最终数据
+    Process split data and generate final data
     
     Args:
-        split_dir: split目录
-        final_dir: final目录
-        split_type: "train" 或 "eval"
-        image_count_category: 图像数量类别
-        target_count: 目标生成数量
-        generated_ids: 已生成的唯一ID集合
+        split_dir: split directory
+        final_dir: final directory
+        split_type: "train" or "eval"
+        image_count_category: image count category
+        target_count: target generation count
+        generated_ids: set of already-generated unique IDs
     """
-    # 加载split数据
+    # Load split data
     samples = load_split_data(split_dir, split_type)
     
-    # 过滤出符合image_count_category的样本
+    # Filter samples matching image_count_category
     filtered_samples = []
     for sample in samples:
         actual_image_count = sample.get('actual_image_count')
@@ -1171,29 +1171,29 @@ def process_split_data(
             if category == image_count_category:
                 filtered_samples.append(sample)
     
-    print(f"找到 {len(filtered_samples)} 个符合 {image_count_category} 的样本")
+    print(f"Found {len(filtered_samples)} samples matching {image_count_category}")
     
-    # 随机打乱样本顺序，实现随机选择
+    # Randomly shuffle samples for random selection
     random.seed(RANDOM_SEED)
     random.shuffle(filtered_samples)
     
-    # 数据目录和图像根目录（使用配置中的路径）
-    data_dir = DATA_DIR  # 原始图文数据所在目录（包含conversation信息的原始数据，用于构建上下文）
-    image_root = None  # 图像根目录（可选，根据实际情况设置）
+    # Data directory and image root directory (using configured paths)
+    data_dir = DATA_DIR  # Directory of raw image-text data (contains conversation info, for building context)
+    image_root = None  # Image root directory (optional, set as needed)
     
     if LOG_TO_SHELL:
-        print(f"  - data_dir: {data_dir} (用于加载原始图文数据)")
+        print(f"  - data_dir: {data_dir} (used for loading raw image-text data)")
         print(f"  - image_root: {image_root}")
     
-    # 创建停止事件
+    # Create stop event
     stop_event = threading.Event()
     
-    # 使用线程池处理
+    # Use thread pool for processing
     current_idx = len(generated_ids)
     completed_count = len(generated_ids)
     
-    # 统计信息
-    total_submitted = completed_count  # 已提交的任务数（包括已完成的）
+    # Statistics
+    total_submitted = completed_count  # Total submitted tasks (including completed)
     
     try:
         with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -1207,7 +1207,7 @@ def process_split_data(
             ) as pbar:
                 pbar.update(completed_count)
                 
-                # 提交初始任务
+                # Submit initial tasks
                 sample_idx = 0
                 while len(futures) < MAX_WORKERS * 2 and sample_idx < len(filtered_samples) and completed_count < target_count:
                     if stop_event.is_set():
@@ -1234,9 +1234,9 @@ def process_split_data(
                     sample_idx += 1
                     total_submitted += 1
                 
-                # 处理完成的任务并提交新任务
+                # Process completed tasks and submit new ones
                 while completed_count < target_count and not stop_event.is_set():
-                    # 检查完成的任务
+                    # Check completed tasks
                     done_futures = []
                     for future in futures:
                         if future.done():
@@ -1246,17 +1246,17 @@ def process_split_data(
                                     completed_count += 1
                                     pbar.update(1)
                                     
-                                    # 更新进度条描述，显示详细统计信息
+                                    # Update progress bar description with detailed statistics
                                     success_rate = (completed_count / total_submitted * 100) if total_submitted > 0 else 0
                                     pbar.set_description(
                                         f"{split_type}/{image_count_category} | "
-                                        f"完成:{completed_count}/{target_count} | "
-                                        f"提交:{total_submitted} | "
-                                        f"成功率:{success_rate:.1f}% | "
-                                        f"运行中:{len(futures)-len(done_futures)}"
+                                        f"Done:{completed_count}/{target_count} | "
+                                        f"Submitted:{total_submitted} | "
+                                        f"SuccessRate:{success_rate:.1f}% | "
+                                        f"Running:{len(futures)-len(done_futures)}"
                                     )
                                     
-                                    # 如果达到目标数量，设置停止事件
+                                    # Set stop event if target count is reached
                                     if completed_count >= target_count:
                                         stop_event.set()
                                         break
@@ -1265,11 +1265,11 @@ def process_split_data(
                                 traceback.print_exc()
                             done_futures.append(future)
                     
-                    # 移除已完成的任务
+                    # Remove completed tasks
                     for future in done_futures:
                         futures.remove(future)
                     
-                    # 提交新任务
+                    # Submit new tasks
                     while len(futures) < MAX_WORKERS * 2 and sample_idx < len(filtered_samples) and completed_count < target_count:
                         if stop_event.is_set():
                             break
@@ -1295,14 +1295,14 @@ def process_split_data(
                         sample_idx += 1
                         total_submitted += 1
                     
-                    # 如果没有更多任务且所有任务都完成，退出循环
+                    # If no more tasks and all tasks are done, exit the loop
                     if sample_idx >= len(filtered_samples) and len(futures) == 0:
                         break
                     
-                    # 短暂休眠，避免CPU占用过高
+                    # Brief sleep to avoid high CPU usage
                     time.sleep(0.1)
                 
-                # 等待所有剩余任务完成
+                # Wait for all remaining tasks to complete
                 for future in as_completed(futures):
                     try:
                         result = future.result()
@@ -1310,54 +1310,54 @@ def process_split_data(
                             completed_count += 1
                             pbar.update(1)
                             
-                            # 更新进度条描述
+                            # Update progress bar description
                             success_rate = (completed_count / total_submitted * 100) if total_submitted > 0 else 0
                             pbar.set_description(
                                 f"{split_type}/{image_count_category} | "
-                                f"完成:{completed_count}/{target_count} | "
-                                f"提交:{total_submitted} | "
-                                f"成功率:{success_rate:.1f}%"
+                                f"Done:{completed_count}/{target_count} | "
+                                f"Submitted:{total_submitted} | "
+                                f"SuccessRate:{success_rate:.1f}%"
                             )
                     except Exception as e:
-                        print(f"任务执行异常: {e}")
+                        print(f"Task execution exception: {e}")
     
     except KeyboardInterrupt:
-        print("\n收到中断信号，正在停止...")
+        print("\nInterrupt signal received, stopping...")
         stop_event.set()
         raise
     
-    print(f"\n{split_type}/{image_count_category} 完成: {completed_count}/{target_count}")
+    print(f"\n{split_type}/{image_count_category} done: {completed_count}/{target_count}")
 
 
 def main():
-    """主函数"""
+    """Main function"""
     print("=" * 80)
-    print("Illustration数据生成脚本")
+    print("Illustration data generation script")
     print("=" * 80)
-    print(f"Split目录: {SPLIT_DIR}")
-    print(f"Final目录: {FINAL_DIR}")
-    print(f"生成配置: {GEN_CONFIG}")
+    print(f"Split directory: {SPLIT_DIR}")
+    print(f"Final directory: {FINAL_DIR}")
+    print(f"Generation config: {GEN_CONFIG}")
     print("=" * 80)
     
-    # 创建final目录
+    # Create final directory
     FINAL_DIR.mkdir(parents=True, exist_ok=True)
     
-    # 处理train和eval数据
+    # Process train and eval data
     for split_type in ["train", "eval"]:
-        print(f"\n处理 {split_type} 数据...")
+        print(f"\nProcessing {split_type} data...")
         
         for image_count_category, config in GEN_CONFIG.items():
             target_count = config.get(split_type, 0)
             
             if target_count <= 0:
-                print(f"跳过 {split_type}/{image_count_category} 数据生成（目标数量为0）")
+                print(f"Skipping {split_type}/{image_count_category} data generation (target count is 0)")
                 continue
             
-            # 加载已生成的唯一识别编号
+            # Load already-generated unique IDs
             generated_ids = load_generated_ids(FINAL_DIR, split_type, image_count_category)
-            print(f"已加载 {len(generated_ids)} 个已生成的样本ID")
+            print(f"Loaded {len(generated_ids)} already-generated sample IDs")
             
-            # 处理数据
+            # Process data
             process_split_data(
                 split_dir=SPLIT_DIR,
                 final_dir=FINAL_DIR,
@@ -1367,7 +1367,7 @@ def main():
                 generated_ids=generated_ids
             )
     
-    print("\n处理完成！")
+    print("\nProcessing complete!")
 
 
 if __name__ == "__main__":

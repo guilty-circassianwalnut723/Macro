@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-评测运行脚本
+Evaluation runner script
 
-从 config.yaml 读取配置并运行评测任务
-支持 LLM 评分任务（customization, spatial, illustration, temporal）
+Read configuration from config.yaml and run evaluation tasks
+Supports LLM scoring tasks (customization, spatial, illustration, temporal)
 
-使用方式:
-    python run_eval.py                           # 运行所有配置的评测
-    python run_eval.py --baseline bagel --exp bagel_official  # 运行指定的评测
-    python run_eval.py --config my_config.yaml   # 使用自定义配置文件
+Usage:
+    python run_eval.py                           # Run all configured evaluations
+    python run_eval.py --baseline bagel --exp bagel_official  # Run specified evaluation
+    python run_eval.py --config my_config.yaml   # Use a custom config file
 """
 
 import os
@@ -24,19 +24,19 @@ DEFAULT_CONFIG = SCRIPT_DIR / "config.yaml"
 MACRO_DIR = SCRIPT_DIR.parent
 EVAL_DIR = SCRIPT_DIR
 
-# 支持的 baseline 模型
+# Supported baseline models
 SUPPORTED_BASELINES = ["bagel", "omnigen", "qwen"]
 
-# LLM 评分任务
+# LLM scoring tasks
 LLM_TASKS = ["customization", "illustration", "spatial", "temporal"]
 IMAGE_NUM_CATEGORIES = ["1-3", "4-5", "6-7", ">=8"]
 
-# 第三方评测任务（未包含在此版本中）
+# Third-party evaluation tasks (not included in this version)
 THIRDPARTY_TASKS = []
 
 
 def load_config(config_path: Path) -> dict:
-    """加载配置文件。使用 FullLoader 以支持 YAML 锚点（*）与合并键（<<）。"""
+    """Load config file. Uses FullLoader to support YAML anchors (*) and merge keys (<<)."""
     with open(config_path, 'r', encoding='utf-8') as f:
         return yaml.load(f, Loader=yaml.FullLoader)
 
@@ -52,20 +52,20 @@ def run_llm_evaluation(
     max_samples: Optional[int] = None,
 ) -> int:
     """
-    运行 LLM 评分任务
+    Run an LLM scoring task
     
     Args:
-        baseline: 模型类型（含 api）
-        exp_name: 实验名称（api 时为 gpt/seed/nano）
-        task: 任务类型
-        category: 图像数量类别
-        output_root: 输出根目录（生成结果根目录，api 时必须与 run 脚本一致）
-        use_gpt: 是否使用 GPT 评分
-        use_gemini: 是否使用 Gemini 评分
-        max_samples: 每个 (task, category) 最多评测的样本数，None 表示全部
+        baseline: model type (includes api)
+        exp_name: experiment name (gpt/seed/nano for api)
+        task: task type
+        category: image count category
+        output_root: output root directory (generation result root; for api, must match run script)
+        use_gpt: whether to use GPT scoring
+        use_gemini: whether to use Gemini scoring
+        max_samples: max samples to evaluate per (task, category); None means all
         
     Returns:
-        退出码
+        exit code
     """
     evaluate_script = EVAL_DIR / "evaluate.py"
     
@@ -91,9 +91,9 @@ def run_llm_evaluation(
     else:
         cmd.append("--no_gemini")
     
-    print(f"\n运行 LLM 评分: {' '.join(cmd)}")
+    print(f"\nRunning LLM scoring: {' '.join(cmd)}")
     
-    # 传递当前环境变量，包括在 main 中设置的 API keys
+    # Pass current environment variables, including API keys set in main
     env = os.environ.copy()
     result = subprocess.run(cmd, env=env)
     return result.returncode
@@ -107,22 +107,22 @@ def run_thirdparty_evaluation(
     global_config: dict
 ) -> int:
     """
-    运行第三方评测任务
+    Run a third-party evaluation task
     
     Args:
-        baseline: 模型类型
-        exp_name: 实验名称
-        task: 任务类型 (omnicontext, geneval, dpg)
-        output_root: 输出根目录
-        global_config: 全局配置
+        baseline: model type
+        exp_name: experiment name
+        task: task type (omnicontext, geneval, dpg)
+        output_root: output root directory
+        global_config: global configuration
         
     Returns:
-        退出码
+        exit code
     """
     output_dir = Path(output_root) / baseline / exp_name / task
     
     if task == "omnicontext":
-        # 运行 omnicontext 评测
+        # Run omnicontext evaluation
         eval_script = THIRDPARTY_DIR / "omnicontext_eval.py"
         cmd = [
             sys.executable, str(eval_script),
@@ -133,12 +133,12 @@ def run_thirdparty_evaluation(
         ]
         
     elif task == "geneval":
-        # 运行 geneval 评测
-        # geneval 需要使用 bench 目录（包含 {idx:05d}/samples/{seed:04d}.png 结构）
+        # Run geneval evaluation
+        # geneval requires bench directory (contains {idx:05d}/samples/{seed:04d}.png structure)
         bench_dir = output_dir / "bench"
         if not bench_dir.exists():
-            print(f"警告: bench 目录不存在: {bench_dir}")
-            print(f"请确保 inference 已成功创建 bench 目录")
+            print(f"Warning: bench directory not found: {bench_dir}")
+            print(f"Please ensure inference has successfully created the bench directory")
             return 1
         
         eval_script = THIRDPARTY_DIR / "geneval_eval.py"
@@ -148,12 +148,12 @@ def run_thirdparty_evaluation(
         ]
         
     elif task == "dpg":
-        # 运行 dpg 评测
-        # dpg 需要使用 bench 目录（包含 grid 图像文件）
+        # Run dpg evaluation
+        # dpg requires bench directory (contains grid image files)
         bench_dir = output_dir / "bench"
         if not bench_dir.exists():
-            print(f"警告: bench 目录不存在: {bench_dir}")
-            print(f"请确保 inference 已成功创建 bench 目录")
+            print(f"Warning: bench directory not found: {bench_dir}")
+            print(f"Please ensure inference has successfully created the bench directory")
             return 1
         
         eval_script = THIRDPARTY_DIR / "dpg_eval.py"
@@ -166,10 +166,10 @@ def run_thirdparty_evaluation(
         ]
         
     else:
-        print(f"错误: 不支持的任务类型: {task}")
+        print(f"Error: unsupported task type: {task}")
         return 1
     
-    print(f"\n运行第三方评测 {task}: {' '.join(cmd)}")
+    print(f"\nRunning third-party evaluation {task}: {' '.join(cmd)}")
     result = subprocess.run(cmd)
     return result.returncode
 
@@ -183,25 +183,25 @@ def run_evaluation(
     exp_config: Optional[dict] = None,
 ) -> Dict[str, Any]:
     """
-    运行单个实验的所有评测任务
+    Run all evaluation tasks for a single experiment
     
     Args:
-        baseline: 模型类型
-        exp_name: 实验名称
-        tasks_config: 任务配置
-        output_root: 输出根目录（来自 global_config，可被 exp 覆盖）
-        global_config: 全局配置
-        exp_config: 当前实验的配置，可含 output_root 覆盖（用于该 baseline 结果不在 global output_root 下的情况）
+        baseline: model type
+        exp_name: experiment name
+        tasks_config: task configuration
+        output_root: output root directory (from global_config, can be overridden by exp)
+        global_config: global configuration
+        exp_config: configuration for the current experiment, may include output_root override (for when baseline results are not under global output_root)
         
     Returns:
-        运行结果统计
+        run result statistics
     """
-    # 允许该实验单独指定 output_root（与 inference 写入路径一致）
+    # Allow this experiment to independently specify output_root (consistent with inference write path)
     if exp_config and exp_config.get("output_root"):
         output_root = exp_config["output_root"]
-        print(f"  使用实验指定 output_root: {output_root}")
+        print(f"  Using experiment-specified output_root: {output_root}")
     print(f"\n{'='*60}")
-    print(f"处理评测: {baseline}/{exp_name}")
+    print(f"Processing evaluation: {baseline}/{exp_name}")
     print(f"{'='*60}")
     
     results = {
@@ -211,15 +211,15 @@ def run_evaluation(
         'details': []
     }
     
-    # 从任务配置中读取 LLM 评测数量限制（仅对 customization/illustration/spatial/temporal 生效）
+    # Read LLM evaluation count limit from task config (only for customization/illustration/spatial/temporal)
     max_samples = tasks_config.get("max_samples")
 
-    # 处理每个任务
+    # Process each task
     for task, task_config in tasks_config.items():
         if task == "max_samples":
             continue
         if task in LLM_TASKS:
-            # LLM 评分任务
+            # LLM scoring tasks
             if isinstance(task_config, str):
                 if task_config == "all":
                     categories = IMAGE_NUM_CATEGORIES
@@ -228,15 +228,15 @@ def run_evaluation(
             elif isinstance(task_config, list):
                 categories = task_config
             else:
-                print(f"警告: 任务 {task} 的配置格式不正确，跳过")
+                print(f"Warning: configuration format for task {task} is incorrect, skipping")
                 continue
             
             for category in categories:
                 results['total'] += 1
-                print(f"\n--- LLM 评分任务: {task}, 类别: {category} ---")
+                print(f"\n--- LLM scoring task: {task}, category: {category} ---")
                 
                 try:
-                    # 从 global_config 读取 LLM 评分配置，默认值：use_gpt=False, use_gemini=True
+                    # Read LLM scoring config from global_config, defaults: use_gpt=False, use_gemini=True
                     use_gpt = global_config.get("use_gpt", False)
                     use_gemini = global_config.get("use_gemini", True)
                     
@@ -259,7 +259,7 @@ def run_evaluation(
                             'type': 'llm',
                             'status': 'success'
                         })
-                        print(f"  ✓ 完成")
+                        print(f"  ✓ Done")
                     else:
                         results['failed'] += 1
                         results['details'].append({
@@ -269,7 +269,7 @@ def run_evaluation(
                             'status': 'failed',
                             'exit_code': exit_code
                         })
-                        print(f"  ✗ 失败 (退出码: {exit_code})")
+                        print(f"  ✗ Failed (exit code: {exit_code})")
                         
                 except Exception as e:
                     results['failed'] += 1
@@ -280,22 +280,22 @@ def run_evaluation(
                         'status': 'failed',
                         'error': str(e)
                     })
-                    print(f"  ✗ 异常: {e}")
+                    print(f"  ✗ Exception: {e}")
         
         elif task in THIRDPARTY_TASKS:
-            # 第三方评测任务
-            # 对于 omnicontext 和 dpg，只要 key 出现就执行
-            # 对于 geneval，true/false 表示是否使用 refine prompt，但都执行
+            # Third-party evaluation task
+            # For omnicontext and dpg, execute whenever the key appears
+            # For geneval, true/false indicates whether to use refine prompt, but always execute
             if task_config is False:
-                # 如果明确设置为 False，跳过（但 geneval 仍然执行）
+                # If explicitly set to False, skip (but geneval still executes)
                 if task == "geneval":
-                    # geneval 即使 false 也执行（只是不使用 refine prompt）
+                    # geneval executes even when false (just does not use refine prompt)
                     pass
                 else:
                     continue
             
             results['total'] += 1
-            print(f"\n--- 第三方评测任务: {task} ---")
+            print(f"\n--- Third-party evaluation task: {task} ---")
             
             try:
                 exit_code = run_thirdparty_evaluation(
@@ -313,7 +313,7 @@ def run_evaluation(
                         'type': 'thirdparty',
                         'status': 'success'
                     })
-                    print(f"  ✓ 完成")
+                    print(f"  ✓ Done")
                 else:
                     results['failed'] += 1
                     results['details'].append({
@@ -322,7 +322,7 @@ def run_evaluation(
                         'status': 'failed',
                         'exit_code': exit_code
                     })
-                    print(f"  ✗ 失败 (退出码: {exit_code})")
+                    print(f"  ✗ Failed (exit code: {exit_code})")
                     
             except Exception as e:
                 results['failed'] += 1
@@ -332,30 +332,30 @@ def run_evaluation(
                     'status': 'failed',
                     'error': str(e)
                 })
-                print(f"  ✗ 异常: {e}")
+                print(f"  ✗ Exception: {e}")
         
         else:
-            print(f"警告: 未知的任务类型: {task}，跳过")
+            print(f"Warning: unknown task type: {task}, skipping")
     
     return results
 
 
 def main():
-    parser = argparse.ArgumentParser(description="评测运行脚本")
+    parser = argparse.ArgumentParser(description="Evaluation runner script")
     parser.add_argument("--config", type=str, default=str(DEFAULT_CONFIG),
-                       help="配置文件路径")
+                       help="config file path")
     parser.add_argument("--baseline", type=str, default=None,
                        choices=SUPPORTED_BASELINES,
-                       help="指定要运行的 baseline 模型")
+                       help="specify the baseline model to run")
     parser.add_argument("--exp", type=str, default=None,
-                       help="指定要运行的实验名称")
+                       help="specify the experiment name to run")
     
     args = parser.parse_args()
     
-    # 加载配置
+    # Load configuration
     config_path = Path(args.config)
     if not config_path.exists():
-        print(f"配置文件不存在: {config_path}")
+        print(f"Config file not found: {config_path}")
         sys.exit(1)
     
     config = load_config(config_path)
@@ -379,28 +379,28 @@ def main():
     evaluations = config.get('evaluations', {})
     
     if not evaluations:
-        print("配置文件中没有评测任务，退出")
+        print("No evaluation tasks in config file, exiting")
         sys.exit(0)
     
-    # 确定要运行的评测
+    # Determine evaluations to run
     evaluations_to_run = {}
     if args.baseline and args.exp:
-        # 指定了 baseline 和 exp
+        # Both baseline and exp are specified
         if args.baseline == "any":
-            print("--baseline any 不支持与 --exp 同时指定，请使用 evaluations.any 配置项列出目录")
+            print("--baseline any does not support being specified together with --exp, please use evaluations.any config item to list directories")
             sys.exit(1)
         if args.baseline not in evaluations:
-            print(f"未找到 baseline: {args.baseline}")
+            print(f"Baseline not found: {args.baseline}")
             sys.exit(1)
         if args.exp not in evaluations[args.baseline]:
-            print(f"未找到实验: {args.baseline}/{args.exp}")
+            print(f"Experiment not found: {args.baseline}/{args.exp}")
             sys.exit(1)
         evaluations_to_run[args.baseline] = {args.exp: evaluations[args.baseline][args.exp]}
     else:
-        # 运行所有配置的评测
+        # Run all configured evaluations
         evaluations_to_run = evaluations
     
-    # 运行评测
+    # Run evaluations
     all_results = {}
     total_success = 0
     total_failed = 0
@@ -409,7 +409,7 @@ def main():
         if baseline_config is None:
             continue
         if isinstance(baseline_config, list):
-            # evaluations.any: list of { path, tasks }，path 为结果根目录
+            # evaluations.any: list of { path, tasks }, path is the result root directory
             for item in baseline_config:
                 path = item.get('path', '').rstrip('/')
                 if not path:
@@ -446,18 +446,18 @@ def main():
                 total_success += results['success']
                 total_failed += results['failed']
     
-    # 打印总结
+    # Print summary
     print(f"\n{'='*60}")
-    print("评测任务总结")
+    print("Evaluation task summary")
     print(f"{'='*60}")
     
     for key, results in all_results.items():
         print(f"\n{key}:")
-        print(f"  成功: {results['success']}/{results['total']}")
-        print(f"  失败: {results['failed']}/{results['total']}")
+        print(f"  Success: {results['success']}/{results['total']}")
+        print(f"  Failed: {results['failed']}/{results['total']}")
         
         if results['failed'] > 0:
-            print("  失败详情:")
+            print("  Failure details:")
             for detail in results['details']:
                 if detail['status'] == 'failed':
                     error = detail.get('error', detail.get('exit_code', 'unknown'))
@@ -466,7 +466,7 @@ def main():
                         task_info += f"/{detail['category']}"
                     print(f"    - {task_info}: {error}")
     
-    print(f"\n总计: 成功 {total_success}, 失败 {total_failed}")
+    print(f"\nTotal: success {total_success}, failed {total_failed}")
     
     if total_failed > 0:
         sys.exit(1)

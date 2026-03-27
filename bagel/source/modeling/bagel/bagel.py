@@ -304,7 +304,7 @@ class Bagel(PreTrainedModel):
 
         _curr = curr = 0
         newlens, new_rope = list(), list()
-        num_images = len(images)  # 获取图像数量，用于动态调整分辨率
+        num_images = len(images)  # Get image count for dynamic resolution adjustment
         for image, curr_kvlen, curr_position_id in zip(images, curr_kvlens, curr_rope):
             packed_key_value_indexes.extend(range(curr, curr + curr_kvlen))
             curr += curr_kvlen
@@ -315,7 +315,7 @@ class Bagel(PreTrainedModel):
             curr += 1
             _curr += 1
 
-            # 传递 img_num 给 transforms 以支持动态分辨率
+            # Pass img_num to transforms to support dynamic resolution
             image_tensor = transforms(image, img_num=num_images)
             vit_position_ids = self.get_flattened_position_ids(
                 image_tensor.size(1), image_tensor.size(2), 
@@ -425,7 +425,7 @@ class Bagel(PreTrainedModel):
         _curr = curr = 0
         vae_image_tensors = list()
         newlens, new_rope = list(), list()
-        num_images = len(images)  # 获取图像数量，用于动态调整分辨率
+        num_images = len(images)  # Get image count for dynamic resolution adjustment
         for image, curr_kvlen, curr_position_id in zip(images, curr_kvlens, curr_rope):
             packed_key_value_indexes.extend(range(curr, curr + curr_kvlen))
             curr += curr_kvlen
@@ -436,7 +436,7 @@ class Bagel(PreTrainedModel):
             curr += 1
             _curr += 1
 
-            # 传递 img_num 给 transforms 以支持动态分辨率
+            # Pass img_num to transforms to support dynamic resolution
             image_tensor = transforms(image, img_num=num_images)
             vae_image_tensors.append(image_tensor)
             vae_posiiton_ids = self.get_flattened_position_ids(

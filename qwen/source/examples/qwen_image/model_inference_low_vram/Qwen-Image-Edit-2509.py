@@ -25,13 +25,13 @@ pipe = QwenImagePipeline.from_pretrained(
     vram_limit=torch.cuda.mem_get_info("cuda")[1] / (1024 ** 3) - 0.5,
 )
 
-image_1 = pipe(prompt="一位少女", seed=0, num_inference_steps=40, height=1328, width=1024)
+image_1 = pipe(prompt="A young girl", seed=0, num_inference_steps=40, height=1328, width=1024)
 image_1.save("image1.jpg")
 
-image_2 = pipe(prompt="一位老人", seed=0, num_inference_steps=40, height=1328, width=1024)
+image_2 = pipe(prompt="An elderly man", seed=0, num_inference_steps=40, height=1328, width=1024)
 image_2.save("image2.jpg")
 
-prompt = "生成这两个人的合影"
+prompt = "Generate a group photo of these two people"
 edit_image = [Image.open("image1.jpg"), Image.open("image2.jpg")]
 image_3 = pipe(prompt, edit_image=edit_image, seed=1, num_inference_steps=40, height=1328, width=1024, edit_image_auto_resize=True)
 image_3.save("image3.jpg")

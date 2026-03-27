@@ -1,64 +1,64 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>多模型对比可视化</title>
+    <title>Multi-Model Comparison Visualization</title>
     <link rel="stylesheet" href="/static/style.css">
     <link rel="stylesheet" href="/static/main.css">
 </head>
 <body>
     <div class="container">
-        <h1>多模型对比可视化</h1>
+        <h1>Multi-Model Comparison Visualization</h1>
 
-        <!-- 选择按钮区域 -->
+        <!-- Selection area -->
         <div class="selection-area">
-            <!-- Baseline 选择 -->
+            <!-- Baseline selection -->
             <div class="selection-group">
-                <label>模型 (Baseline)</label>
+                <label>Model (Baseline)</label>
                 <div class="button-group" id="baseline-buttons">
-                    <div class="loading">加载中...</div>
+                    <div class="loading">Loading...</div>
                 </div>
             </div>
-            
-            <!-- 任务选择 -->
+
+            <!-- Task selection -->
             <div class="selection-group">
-                <label>任务 (Task)</label>
+                <label>Task</label>
                 <div class="button-group" id="task-buttons">
-                    <span class="empty-state">请先选择模型</span>
+                    <span class="empty-state">Please select a model first</span>
                 </div>
             </div>
-            
-            <!-- 实验选择 -->
+
+            <!-- Experiment selection -->
             <div class="selection-group exp-selection-group">
-                <label>实验选择 - 可多选</label>
+                <label>Experiment Selection - Multi-select</label>
                 <div class="two-column-selection">
                     <div class="column-selection">
-                        <div class="column-label">实验名称</div>
+                        <div class="column-label">Experiment Name</div>
                         <div class="button-group" id="exp-base-buttons">
-                            <span class="empty-state">请先选择任务</span>
+                            <span class="empty-state">Please select a task first</span>
                         </div>
                     </div>
                     <div class="column-selection">
-                        <div class="column-label">Step 步数 - 可多选</div>
+                        <div class="column-label">Step - Multi-select</div>
                         <div class="button-group" id="exp-step-buttons">
-                            <span class="empty-state">请先选择实验名称</span>
+                            <span class="empty-state">Please select an experiment name first</span>
                         </div>
                     </div>
                 </div>
             </div>
-            
-            <!-- 类别选择 -->
+
+            <!-- Category selection -->
             <div class="selection-group">
-                <label>类别 (Category)</label>
+                <label>Category</label>
                 <div class="button-group" id="category-buttons">
-                    <span class="empty-state">请先选择实验</span>
+                    <span class="empty-state">Please select an experiment first</span>
                 </div>
             </div>
-            
-            <!-- 评估器选择 -->
+
+            <!-- Evaluator selection -->
             <div class="selection-group">
-                <label>评估器 (Evaluator)</label>
+                <label>Evaluator</label>
                 <div class="button-group" id="evaluator-buttons">
                     <button class="btn active" onclick="selectEvaluator('gpt')">GPT-4o</button>
                     <button class="btn" onclick="selectEvaluator('gemini')">Gemini</button>
@@ -66,46 +66,46 @@
             </div>
         </div>
 
-        <!-- 对比统计区域 -->
+        <!-- Comparison statistics area -->
         <div class="comparison-area" id="comparison-area" style="display: none;">
-            <div class="comparison-title">实验对比统计</div>
+            <div class="comparison-title">Experiment Comparison Statistics</div>
             <div class="comparison-table-container">
                 <table class="comparison-table" id="comparison-table">
                     <thead>
                         <tr>
-                            <th>指标</th>
-                            <!-- 动态添加实验列 -->
+                            <th>Metric</th>
+                            <!-- Dynamically added experiment columns -->
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- 动态添加数据行 -->
+                        <!-- Dynamically added data rows -->
                     </tbody>
                 </table>
             </div>
         </div>
 
-        <!-- Ours 视图区域（仅展示得分，无样例） -->
+        <!-- Ours view area (scores only, no samples) -->
         <div class="ours-area" id="ours-area" style="display: none;">
-            <div class="ours-title">Ours 聚合得分 (customization + illustration + spatial + temporal)</div>
+            <div class="ours-title">Ours Aggregated Scores (customization + illustration + spatial + temporal)</div>
             <div class="ours-table-container" id="ours-table-container">
-                <!-- 动态生成 ours 表格 -->
+                <!-- Dynamically generated ours table -->
             </div>
         </div>
 
-        <!-- Benchmark 区域（保留元素避免 JS 报错，始终隐藏） -->
+        <!-- Benchmark area (kept to avoid JS errors, always hidden) -->
         <div id="benchmark-area" style="display: none;"></div>
 
-        <!-- 样本展示区域 -->
+        <!-- Sample display area -->
         <div class="samples-area" id="samples-area" style="display: none;">
             <div class="samples-header">
-                <h2>样本对比展示</h2>
+                <h2>Sample Comparison</h2>
                 <div class="pagination" id="pagination"></div>
             </div>
             <div class="samples-list" id="samples-list"></div>
         </div>
     </div>
 
-    <!-- 浮动换页按钮 -->
+    <!-- Floating page navigation buttons -->
     <div class="floating-pagination" id="floating-pagination" style="display: none;">
         <button class="floating-pagination-btn" id="floating-prev-btn" onclick="changePage(currentPage - 1)" disabled>
             <span>‹</span>

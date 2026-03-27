@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Temporal任务评分模块
+Temporal task scoring module
 
-提供temporal任务的评分函数（GPT和Gemini）
+Provides scoring functions (GPT and Gemini) for the temporal task
 """
 
 import os
@@ -21,13 +21,13 @@ macro_dir = script_dir.parents[2]  # eval/score -> eval -> Macro
 if str(macro_dir) not in sys.path:
     sys.path.insert(0, str(macro_dir))
 
-# 尝试导入utils模块
+# Try to import utils module
 from utils.openai_utils import ask_gpt4o
 from utils.json_utils import mllm_output_to_dict
 from api_generator.text_generator.gemini_api import GeminiAPIGenerator
 
 # ============================================================================
-# PROMPT 配置
+# PROMPT configuration
 # ============================================================================
 EVALUATION_PROMPT = """You are a strict Video Continuity Specialist and QA Expert. Your task is to evaluate the quality of a generated frame in a temporal sequence.
 
@@ -82,7 +82,7 @@ State clearly if the score deduction is due to "Instruction Failure" (Metric 1) 
 """
 
 # ============================================================================
-# 配置常量
+# Configuration constants
 # ============================================================================
 GPT_CONFIG = {
     "url": os.environ.get("OPENAI_URL", "https://api.openai.com/v1/chat/completions"),
@@ -101,7 +101,7 @@ TIMEOUT = 60
 
 
 # ============================================================================
-# Prompt构建函数
+# Prompt construction functions
 # ============================================================================
 def build_prompt(instruction: str, image_descriptions: str) -> str:
     return EVALUATION_PROMPT.format(
@@ -123,7 +123,7 @@ def build_image_descriptions(reference_images: List[str], generated_image: str) 
 
 
 # ============================================================================
-# 评分函数
+# Scoring functions
 # ============================================================================
 def evaluate_with_gpt(sample_data: Dict[str, Any], sample_id: str = "") -> Optional[Dict[str, Any]]:
     instruction = sample_data.get('instruction', '')
@@ -141,11 +141,11 @@ def evaluate_with_gpt(sample_data: Dict[str, Any], sample_id: str = "") -> Optio
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             if attempt > 1:
-                print(f"[GPT] {sample_id}: 重试第 {attempt} 次（共 {MAX_RETRIES} 次）...")
+                print(f"[GPT] {sample_id}: Retry attempt {attempt} (of {MAX_RETRIES})...")
             
             response = ask_gpt4o(all_images, prompt, GPT_CONFIG["url"], GPT_CONFIG["key"])
             if not response:
-                print(f"[GPT] {sample_id}: 尝试 {attempt}/{MAX_RETRIES}: 空响应")
+                print(f"[GPT] {sample_id}: Attempt {attempt}/{MAX_RETRIES}: empty response")
                 if attempt < MAX_RETRIES:
                     time.sleep(RETRY_DELAY)
                     continue
@@ -155,22 +155,22 @@ def evaluate_with_gpt(sample_data: Dict[str, Any], sample_id: str = "") -> Optio
             if result and isinstance(result, dict):
                 if 'context_consistency_score' in result and 'image_sequence_consistency_score' in result:
                     if attempt > 1:
-                        print(f"[GPT] {sample_id}: 第 {attempt} 次尝试成功")
+                        print(f"[GPT] {sample_id}: Attempt {attempt} succeeded")
                     return result
                 else:
-                    print(f"[GPT] {sample_id}: 尝试 {attempt}/{MAX_RETRIES}: 结果格式不正确 - {list(result.keys())}")
+                    print(f"[GPT] {sample_id}: Attempt {attempt}/{MAX_RETRIES}: result format incorrect - {list(result.keys())}")
                     if attempt < MAX_RETRIES:
                         time.sleep(RETRY_DELAY)
                         continue
                     return None
             else:
-                print(f"[GPT] {sample_id}: 尝试 {attempt}/{MAX_RETRIES}: 解析失败 - {response[:200]}")
+                print(f"[GPT] {sample_id}: Attempt {attempt}/{MAX_RETRIES}: parse failed - {response[:200]}")
                 if attempt < MAX_RETRIES:
                     time.sleep(RETRY_DELAY)
                     continue
                 return None
         except Exception as e:
-            print(f"[GPT] {sample_id}: 尝试 {attempt}/{MAX_RETRIES}: 错误 - {e}")
+            print(f"[GPT] {sample_id}: Attempt {attempt}/{MAX_RETRIES}: error - {e}")
             if attempt < MAX_RETRIES:
                 traceback.print_exc()
                 time.sleep(RETRY_DELAY)
@@ -218,20 +218,20 @@ def evaluate_with_gemini(sample_data: Dict[str, Any], generator: 'GeminiAPIGener
         )
         
         if response is None:
-            print(f"[Gemini] {sample_id}: 空响应")
+            print(f"[Gemini] {sample_id}: empty response")
             return None
         
         if isinstance(response, dict):
             if 'context_consistency_score' in response and 'image_sequence_consistency_score' in response:
                 return response
             else:
-                print(f"[Gemini] {sample_id}: 结果格式不正确 - {list(response.keys())}")
+                print(f"[Gemini] {sample_id}: result format incorrect - {list(response.keys())}")
                 return None
         else:
-            print(f"[Gemini] {sample_id}: 意外的响应类型 - {type(response)}")
+            print(f"[Gemini] {sample_id}: unexpected response type - {type(response)}")
             return None
     except Exception as e:
-        print(f"[Gemini] {sample_id}: 错误 - {e}")
+        print(f"[Gemini] {sample_id}: error - {e}")
         traceback.print_exc()
         return None
 

@@ -62,7 +62,7 @@ pipe = QwenImagePipeline.from_pretrained(
     ],
     tokenizer_config=ModelConfig(model_id="Qwen/Qwen-Image", origin_file_pattern="tokenizer/"),
 )
-prompt = "精致肖像，水下少女，蓝裙飘逸，发丝轻扬，光影透澈，气泡环绕，面容恬静，细节精致，梦幻唯美。"
+prompt = "Exquisite portrait, underwater girl, blue dress flowing, hair gently swaying, light and shadow translucent, bubbles surrounding, serene expression, intricate details, dreamy and beautiful."
 image = pipe(prompt, seed=0, num_inference_steps=40)
 image.save("image.jpg")
 ```
@@ -71,7 +71,7 @@ Then, we compile the necessary information into [metadata files](/docs/en/API_Re
 
 ```csv
 image,prompt,seed,rand_device,num_inference_steps,cfg_scale
-distill_qwen/image.jpg,"精致肖像，水下少女，蓝裙飘逸，发丝轻扬，光影透澈，气泡环绕，面容恬静，细节精致，梦幻唯美。",0,cpu,4,1
+distill_qwen/image.jpg,"Exquisite portrait, underwater girl, blue dress flowing, hair gently swaying, light and shadow translucent, bubbles surrounding, serene expression, intricate details, dreamy and beautiful.",0,cpu,4,1
 ```
 
 This sample dataset can be downloaded directly:

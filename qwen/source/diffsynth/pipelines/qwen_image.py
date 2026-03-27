@@ -128,7 +128,7 @@ class QwenImagePipeline(BasePipeline):
         edit_image: Image.Image = None,
         edit_image_auto_resize: bool = True,
         edit_rope_interpolation: bool = False,
-        max_input_pixels = None,  # 可以是 int 或 list，用于动态调整输入图像分辨率
+        max_input_pixels = None,  # can be int or list, used to dynamically adjust input image resolution
         # Qwen-Image-Edit-2511
         zero_cond_t: bool = False,
         # Qwen-Image-Layered
@@ -546,7 +546,7 @@ class QwenImageUnit_EditImageEmbedder(PipelineUnit):
         return width, height
 
     def _get_max_pixels_for_img_num(self, max_input_pixels, img_num):
-        """根据图像数量获取单张图片的 max_pixels 限制"""
+        """Get max_pixels limit for a single image based on the number of images"""
         if isinstance(max_input_pixels, (list, tuple)):
             idx = min(img_num - 1, len(max_input_pixels) - 1)
             idx = max(0, idx)

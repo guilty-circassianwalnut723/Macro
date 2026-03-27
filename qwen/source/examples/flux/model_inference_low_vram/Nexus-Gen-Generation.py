@@ -34,7 +34,7 @@ pipe = FluxImagePipeline.from_pretrained(
     vram_limit=torch.cuda.mem_get_info("cuda")[1] / (1024 ** 3) - 0.5,
 )
 
-prompt = "一只可爱的猫咪"
+prompt = "An adorable cat"
 image = pipe(
     prompt=prompt, negative_prompt="",
     seed=0, cfg_scale=3, num_inference_steps=50,

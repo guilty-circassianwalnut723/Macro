@@ -123,7 +123,7 @@ User Prompt:'''
 
             messages[0]["content"].append({"type": "image", "image": imgs})
 
-            # 再添加 text
+            # Then add text
             messages[0]["content"].append({"type": "text", "text": f"{txt}"})
 
             # Preparation for inference

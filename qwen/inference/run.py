@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Qwen-Image-Edit 推理运行脚本
+Qwen-Image-Edit inference run script
 
-从 config.yaml 读取配置并运行推理任务
+Reads configuration from config.yaml and runs inference tasks
 
-使用方式:
-    python run.py                           # 运行所有配置的 checkpoints
-    python run.py --list                    # 列出所有可用的 checkpoints
-    python run.py --ckpt qwen_official      # 运行指定的 checkpoint
+Usage:
+    python run.py                           # run all configured checkpoints
+    python run.py --list                    # list all available checkpoints
+    python run.py --ckpt qwen_official      # run a specific checkpoint
     python run.py --ckpt qwen_official --task customization --category 1-3
-    python run.py --config my_config.yaml   # 使用自定义配置文件
+    python run.py --config my_config.yaml   # use a custom config file
 """
 
 import os

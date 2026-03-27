@@ -107,7 +107,7 @@ height = 448
 width = 832
 
 prompt = "a person is singing"
-negative_prompt = "画面模糊，最差质量，画面模糊，细节模糊不清，情绪激动剧烈，手快速抖动，字幕，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走"
+negative_prompt = "blurry footage, worst quality, blurry footage, blurry details, intense extreme emotions, fast hand shaking, subtitles, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fused fingers, frozen frame, cluttered background, three legs, many people in background, walking backwards"
 input_image = Image.open("data/example_video_dataset/wans2v/pose.png").convert("RGB").resize((width, height))
 
 video_with_audio = speech_to_video(

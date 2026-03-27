@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Temporal数据筛选脚本
+Temporal data filtering script
 
-功能：
-1. 从final/temporal目录读取数据
-2. 筛选分数高于阈值的样本
-3. 转换为最简格式，只保留: task, idx, prompt, input_images, output_image
-4. 保存到filter/temporal目录
+Features:
+1. Read data from the final/temporal directory
+2. Filter samples with scores above threshold
+3. Convert to minimal format, keeping only: task, idx, prompt, input_images, output_image
+4. Save to filter/temporal directory
 """
 
 import json
@@ -16,22 +16,22 @@ import hashlib
 from pathlib import Path
 from typing import Dict, Any, List
 
-# 添加utils路径
+# Add utils path
 import sys
 CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(CURRENT_DIR))
 
 from utils.convert_to_minimal import convert_to_minimal
 
-# ====== 配置参数 ======
+# ====== Configuration parameters ======
 FINAL_DIR = (Path(__file__).resolve().parent.parent.parent / "data" / "final" / "temporal")
 FILTER_DIR = (Path(__file__).resolve().parent.parent.parent / "data" / "filter" / "temporal")
 # You can override FILTER_DIR to use a custom path if needed
 
-# 筛选阈值（需要根据实际需求调整）
+# Filtering threshold (adjust according to actual needs)
 TEMPORAL_SCORE_THRESHOLD = 6
 
-# 筛选配置：{image_count_category: {train: count, eval: count}}
+# Filter config: {image_count_category: {train: count, eval: count}}
 FILTER_CONFIG = {
     "1-3": {"train": 25000, "eval": 250},
     "4-5": {"train": 25000, "eval": 250},
@@ -39,45 +39,45 @@ FILTER_CONFIG = {
     ">=8": {"train": 25000, "eval": 250},
 }
 
-# 随机种子
+# Random seed
 RANDOM_SEED = 42
 # ======================
 
 
 def get_deterministic_seed(seed_str: str) -> int:
     """
-    生成确定性的随机种子（使用hashlib确保跨运行的一致性）
+    Generate a deterministic random seed (using hashlib to ensure cross-run consistency)
     
     Args:
-        seed_str: 种子字符串
+        seed_str: seed string
     
     Returns:
-        确定性的整数种子
+        deterministic integer seed
     """
-    # 使用hashlib生成确定性的哈希值
+    # Use hashlib to generate a deterministic hash value
     hash_obj = hashlib.md5(seed_str.encode('utf-8'))
     hash_int = int(hash_obj.hexdigest(), 16)
-    # 取模确保在合理范围内
+    # Modulo to keep within reasonable range
     return hash_int % (2**31)
 
 
 def filter_samples(samples: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    筛选样本
+    Filter samples
     
     Args:
-        samples: 样本列表
+        samples: list of samples
     
     Returns:
-        筛选后的样本列表
+        filtered sample list
     """
     filtered = []
     
     for sample in samples:
-        # 检查分数（需要根据实际字段名调整）
+        # Check scores (adjust field names according to actual data)
         temporal_score = sample.get("temporal_score", sample.get("score", 0))
         
-        # 筛选分数高于阈值的样本
+        # Keep samples with scores above threshold
         if temporal_score >= TEMPORAL_SCORE_THRESHOLD:
             input_num = len(sample.get("input_images", []))
             if input_num > 10:
@@ -89,56 +89,56 @@ def filter_samples(samples: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 
 
 def main():
-    """主函数"""
+    """Main function"""
     print("=" * 80)
-    print("Temporal数据筛选脚本")
+    print("Temporal data filtering script")
     print("=" * 80)
-    print(f"Final目录: {FINAL_DIR}")
-    print(f"Filter目录: {FILTER_DIR}")
-    print(f"Temporal Score阈值: {TEMPORAL_SCORE_THRESHOLD}")
-    print(f"筛选配置: {FILTER_CONFIG}")
+    print(f"Final directory: {FINAL_DIR}")
+    print(f"Filter directory: {FILTER_DIR}")
+    print(f"Temporal Score threshold: {TEMPORAL_SCORE_THRESHOLD}")
+    print(f"Filter config: {FILTER_CONFIG}")
     print("=" * 80)
     
     if not FINAL_DIR.exists():
-        print(f"错误: Final目录不存在: {FINAL_DIR}")
+        print(f"Error: Final directory does not exist: {FINAL_DIR}")
         return
     
-    # 确保 FILTER_DIR 存在
+    # Ensure FILTER_DIR exists
     FILTER_DIR.mkdir(parents=True, exist_ok=True)
     
-    # 对于train，清除整个train目录后重新构建
+    # For train, clear the entire train directory and rebuild
     if (FILTER_DIR / "train").exists():
-        print(f"清除 Train 目录: {FILTER_DIR / 'train'}")
+        print(f"Clearing Train directory: {FILTER_DIR / 'train'}")
         shutil.rmtree(FILTER_DIR / "train")
     (FILTER_DIR / "train").mkdir(parents=True, exist_ok=True)
     
-    # 处理train和eval数据
+    # Process train and eval data
     for split_type in ["train", "eval"]:
-        print(f"\n处理 {split_type} 数据...")
+        print(f"\nProcessing {split_type} data...")
         
-        # 遍历所有image_count_category目录
+        # Iterate over all image_count_category directories
         for category_dir in (FINAL_DIR / split_type).glob("*"):
             if not category_dir.is_dir():
                 continue
             
             image_count_category = category_dir.name
             
-            # 检查是否有配置，如果没有配置则跳过数量控制
+            # Check config; skip count control if not configured
             if image_count_category not in FILTER_CONFIG:
-                print(f"\n处理类别: {image_count_category} (无数量限制)")
+                print(f"\nProcessing category: {image_count_category} (no count limit)")
                 target_count = None
             else:
                 target_count = FILTER_CONFIG[image_count_category].get(split_type)
                 if target_count is None:
-                    print(f"\n处理类别: {image_count_category} (无数量限制)")
+                    print(f"\nProcessing category: {image_count_category} (no count limit)")
                     target_count = None
                 else:
-                    print(f"\n处理类别: {image_count_category} (目标数量: {target_count})")
+                    print(f"\nProcessing category: {image_count_category} (target count: {target_count})")
             
             if split_type == "eval" and target_count is None:
                 continue
             
-            # 对于eval，检查现有数据数量
+            # For eval, check the existing data count
             output_dir = FILTER_DIR / split_type / image_count_category
             existing_count = 0
             existing_identifiers = set()
@@ -146,33 +146,33 @@ def main():
                 existing_files = list(output_dir.glob("*.json"))
                 existing_count = len(existing_files)
                 if target_count is not None and existing_count >= target_count:
-                    print(f"  Eval数据已满足目标数量 ({existing_count} >= {target_count})，跳过")
+                    print(f"  Eval data already meets target count ({existing_count} >= {target_count}), skipping")
                     continue
                 elif existing_count > 0:
-                    print(f"  现有Eval数据: {existing_count} 个，目标: {target_count}，需要补足 {target_count - existing_count} 个")
-                    # 读取现有文件的unique_id或其他唯一标识
+                    print(f"  Existing Eval data: {existing_count}, target: {target_count}, need {target_count - existing_count} more")
+                    # Read unique_id or other unique identifier from existing files
                     for existing_file in output_dir.glob("*.json"):
                         try:
                             with open(existing_file, 'r', encoding='utf-8') as f:
                                 existing_sample = json.load(f)
-                                # 尝试使用unique_id，如果没有则使用其他唯一标识
+                                # Try to use unique_id; fall back to other unique identifier if unavailable
                                 unique_id = existing_sample.get("unique_id")
                                 if unique_id:
                                     existing_identifiers.add(unique_id)
                                 else:
-                                    # 使用source_file+source_line+true_index作为备选
+                                    # Use source_file+source_line+true_index as fallback
                                     source_file = existing_sample.get("source_file", "")
                                     source_line = existing_sample.get("source_line", -1)
                                     true_index = existing_sample.get("true_index", -1)
                                     existing_identifiers.add((source_file, source_line, true_index))
                         except Exception as e:
-                            print(f"  警告: 读取现有文件失败 {existing_file}: {e}")
+                            print(f"  Warning: failed to read existing file {existing_file}: {e}")
                             continue
             
-            # 读取JSON文件
+            # Read JSON files
             json_dir = category_dir / "json"
             if not json_dir.exists():
-                print(f"  跳过: JSON目录不存在")
+                print(f"  Skipping: JSON directory does not exist")
                 continue
             
             samples = []
@@ -180,23 +180,23 @@ def main():
                 try:
                     with open(json_file, 'r', encoding='utf-8') as f:
                         sample = json.load(f)
-                        # 提取idx
+                        # Extract idx
                         idx = int(json_file.stem)
                         samples.append((idx, sample))
                 except Exception as e:
-                    print(f"  警告: 读取JSON文件失败 {json_file}: {e}")
+                    print(f"  Warning: failed to read JSON file {json_file}: {e}")
                     continue
             
-            print(f"  加载了 {len(samples)} 个样本")
+            print(f"  Loaded {len(samples)} samples")
             
-            # 筛选样本
+            # Filter samples
             filtered_samples = filter_samples([s[1] for s in samples])
-            print(f"  筛选后: {len(filtered_samples)} 个样本")
+            print(f"  After filtering: {len(filtered_samples)} samples")
             
-            # 创建筛选后的样本及其索引的列表
+            # Create list of filtered samples with their indices
             filtered_with_idx = [(idx, sample) for idx, sample in samples if sample in filtered_samples]
             
-            # 对于eval，需要排除已存在的样本
+            # For eval, exclude already existing samples
             if split_type == "eval" and existing_count > 0:
                 original_count = len(filtered_with_idx)
                 filtered_with_idx = [
@@ -206,39 +206,39 @@ def main():
                         (sample.get("source_file", ""), sample.get("source_line", -1), sample.get("true_index", -1)) in existing_identifiers
                     )
                 ]
-                print(f"  排除已存在样本后: {len(filtered_with_idx)} 个样本（移除了 {original_count - len(filtered_with_idx)} 个）")
+                print(f"  After excluding existing samples: {len(filtered_with_idx)} samples (removed {original_count - len(filtered_with_idx)})")
             
-            # 如果配置了目标数量且筛选后样本数量多于目标数量，打乱并取前n个
+            # If target count is configured and filtered samples exceed it, shuffle and take the first n
             if target_count is not None:
                 if split_type == "eval":
-                    # eval需要补足的数量
+                    # Number needed to fill eval quota
                     needed_count = target_count - existing_count
                     if needed_count > 0 and len(filtered_with_idx) > needed_count:
-                        # 设置随机种子以确保可重现性（基于split_type和image_count_category）
+                        # Set random seed for reproducibility (based on split_type and image_count_category)
                         seed_str = f"{RANDOM_SEED}_{split_type}_{image_count_category}"
                         seed_hash = get_deterministic_seed(seed_str)
                         random.seed(seed_hash)
                         random.shuffle(filtered_with_idx)
-                        # 取前needed_count个
+                        # Take the first needed_count
                         filtered_with_idx = filtered_with_idx[:needed_count]
-                        print(f"  打乱后取前 {needed_count} 个样本用于补足")
+                        print(f"  Shuffled and took first {needed_count} samples to fill quota")
                 else:
-                    # train保持原有逻辑
+                    # Train keeps the original logic
                     if len(filtered_with_idx) > target_count:
-                        # 设置随机种子以确保可重现性（基于split_type和image_count_category）
+                        # Set random seed for reproducibility (based on split_type and image_count_category)
                         seed_str = f"{RANDOM_SEED}_{split_type}_{image_count_category}"
                         seed_hash = get_deterministic_seed(seed_str)
                         random.seed(seed_hash)
                         random.shuffle(filtered_with_idx)
-                        # 取前target_count个
+                        # Take the first target_count
                         filtered_with_idx = filtered_with_idx[:target_count]
-                        print(f"  打乱后取前 {target_count} 个样本")
+                        print(f"  Shuffled and took first {target_count} samples")
             
-            # 转换为最简格式并保存
+            # Convert to minimal format and save
             output_dir.mkdir(parents=True, exist_ok=True)
             
             if split_type == "eval" and existing_count > 0:
-                # eval：找到当前最大编号，从下一个编号开始
+                # eval: find current max index, start from next index
                 existing_indices = []
                 for existing_file in output_dir.glob("*.json"):
                     try:
@@ -248,13 +248,13 @@ def main():
                         continue
                 start_idx = max(existing_indices, default=0) + 1
             else:
-                # train：重新编号，从1开始
+                # train: re-number starting from 1
                 start_idx = 1
-                # 清空已存在的文件（仅对train）
+                # Clear existing files (train only)
                 for existing_file in output_dir.glob("*.json"):
                     existing_file.unlink()
             
-            # 保存样本
+            # Save samples
             for i, (original_idx, sample) in enumerate(filtered_with_idx, start=start_idx):
                 minimal = convert_to_minimal(sample, "temporal", i)
                 output_file = output_dir / f"{i:08d}.json"
@@ -262,9 +262,9 @@ def main():
                     json.dump(minimal, f, ensure_ascii=False, indent=2)
             
             final_count = existing_count + len(filtered_with_idx) if split_type == "eval" and existing_count > 0 else len(filtered_with_idx)
-            print(f"  已保存到: {output_dir}（共 {final_count} 个样本）")
+            print(f"  Saved to: {output_dir} (total {final_count} samples)")
     
-    print("\n处理完成！")
+    print("\nProcessing complete!")
 
 
 if __name__ == "__main__":

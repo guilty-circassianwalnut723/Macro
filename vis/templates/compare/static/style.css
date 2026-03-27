@@ -27,7 +27,7 @@ h1 {
     font-size: 2em;
 }
 
-/* 选择按钮区域 */
+/* Selection button area */
 .selection-area {
     display: flex;
     gap: 15px;
@@ -114,7 +114,7 @@ h1 {
     color: #999;
 }
 
-/* Baseline按钮特殊样式 */
+/* Baseline button special styles */
 .btn.baseline-btn {
     border-color: #764ba2;
     color: #764ba2;
@@ -131,7 +131,7 @@ h1 {
     color: white;
 }
 
-/* 对比统计区域 */
+/* Comparison statistics area */
 .comparison-area {
     background: #f8f9fa;
     border-radius: 8px;
@@ -200,7 +200,7 @@ h1 {
     font-weight: 600;
 }
 
-/* Benchmark评测结果区域 */
+/* Benchmark evaluation results area */
 .benchmark-area {
     background: #f0f8ff;
     border-radius: 8px;
@@ -276,7 +276,7 @@ h1 {
     color: #17a2b8;
 }
 
-/* 样本展示区域 */
+/* Sample display area */
 .samples-area {
     margin-top: 30px;
 }
@@ -423,7 +423,7 @@ h1 {
     padding: 0 10px;
 }
 
-/* 实验对比区域 */
+/* Experiment comparison area */
 .experiments-comparison {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -550,7 +550,7 @@ h1 {
     font-size: 14px;
 }
 
-/* 浮动换页按钮 */
+/* Floating page navigation buttons */
 .floating-pagination {
     position: fixed;
     bottom: 30px;
@@ -614,7 +614,7 @@ h1 {
     padding: 0 8px;
 }
 
-/* 响应式设计 */
+/* Responsive design */
 @media (max-width: 768px) {
     .container {
         padding: 15px;

@@ -1,23 +1,23 @@
-// 全局状态
-let currentBaseline = null;  // 当前选择的baseline
+// Global state
+let currentBaseline = null;  // Currently selected baseline
 let currentTask = null;
-let selectedExps = [];  // 支持多选（完整的实验名称列表）
-let selectedExpBases = [];  // 选中的实验基础名称列表（多选）
-let selectedSteps = [];  // 选中的step列表（多选）
-let expStructure = null;  // 实验结构数据 {base_names, steps, exp_map}
-let currentCategory = null;  // 当前选择的类别
+let selectedExps = [];  // Supports multi-select (full list of experiment names)
+let selectedExpBases = [];  // List of selected experiment base names (multi-select)
+let selectedSteps = [];  // List of selected steps (multi-select)
+let expStructure = null;  // Experiment structure data {base_names, steps, exp_map}
+let currentCategory = null;  // Currently selected category
 let sampleIds = [];
 let currentPage = 1;
-let totalPages = 1;  // 总页数
-let currentEvaluator = 'gpt';  // 当前选择的评估器：'gpt' 或 'gemini'
+let totalPages = 1;  // Total pages
+let currentEvaluator = 'gpt';  // Currently selected evaluator: 'gpt' or 'gemini'
 const itemsPerPage = 10;
 
 const API_BASE = '';
 
-// 自然排序函数（处理数字排序，如 exp2 在 exp10 之前）
+// Natural sort function (handles numeric ordering, e.g. exp2 before exp10)
 function naturalSort(arr) {
     return arr.slice().sort((a, b) => {
-        // 将字符串分割成文本和数字部分
+        // Split string into text and numeric parts
         const regex = /(\d+)/g;
         const aParts = a.split(regex);
         const bParts = b.split(regex);
@@ -28,7 +28,7 @@ function naturalSort(arr) {
             const aPart = aParts[i];
             const bPart = bParts[i];
             
-            // 如果都是数字，按数字大小比较
+            // If both are numeric, compare by numeric value
             if (/^\d+$/.test(aPart) && /^\d+$/.test(bPart)) {
                 const numA = parseInt(aPart, 10);
                 const numB = parseInt(bPart, 10);
@@ -36,25 +36,25 @@ function naturalSort(arr) {
                     return numA - numB;
                 }
             } else {
-                // 否则按字符串比较
+                // Otherwise compare as strings
                 if (aPart !== bPart) {
                     return aPart < bPart ? -1 : 1;
                 }
             }
         }
         
-        // 如果前面的部分都相同，长度短的排在前面
+        // If all preceding parts are equal, shorter array comes first
         return aParts.length - bParts.length;
     });
 }
 
-// 获取排序后的实验列表
+// Get sorted experiment list
 function getSortedExps(exps) {
     return naturalSort(exps);
 }
 
-// 根据选择的实验基础名称和step，组合成完整的实验名称列表
-// 注意：Python 的 None key 被 JSON 序列化后变为字符串 "null"，需用 'null' 查找
+// Combine selected experiment base names and steps into full experiment name list
+// Note: Python's None key becomes the string "null" after JSON serialization; use 'null' for lookup
 function combineExpNames() {
     if (!expStructure || selectedExpBases.length === 0) {
         selectedExps = [];
@@ -64,12 +64,12 @@ function combineExpNames() {
     const combined = [];
     for (const baseName of selectedExpBases) {
         if (expStructure.exp_map[baseName]) {
-            // 对于没有step的实验（Python None key 序列化为字符串 'null'），总是加入
+            // For experiments without a step (Python None key serialized as 'null'), always include
             if (expStructure.exp_map[baseName]['null']) {
                 combined.push(expStructure.exp_map[baseName]['null']);
             }
             
-            // 对于有step的实验，根据选中的steps（多选）组合
+            // For experiments with steps, combine based on selected steps (multi-select)
             if (selectedSteps.length > 0) {
                 for (const step of selectedSteps) {
                     if (expStructure.exp_map[baseName][step]) {
@@ -82,7 +82,7 @@ function combineExpNames() {
     selectedExps = combined;
 }
 
-// 从完整的实验名称列表中解析出实验基础名称和step
+// Parse experiment base names and steps from the full experiment name list
 function parseExpNamesFromFullNames(fullNames) {
     if (!fullNames || fullNames.length === 0) {
         selectedExpBases = [];
@@ -90,18 +90,18 @@ function parseExpNamesFromFullNames(fullNames) {
         return;
     }
     
-    // 解析每个完整名称，提取基础名称和step
+    // Parse each full name, extract base name and step
     const basesSet = new Set();
     const stepsSet = new Set();
     
     for (const fullName of fullNames) {
-        // 尝试从expStructure中查找
+        // Try to look up from expStructure
         if (expStructure && expStructure.exp_map) {
             for (const [baseName, steps] of Object.entries(expStructure.exp_map)) {
                 for (const [step, expName] of Object.entries(steps)) {
                     if (expName === fullName) {
                         basesSet.add(baseName);
-                        // 收集所有的step（排除null，因为null对应的实验会直接显示）
+                        // Collect all steps (exclude null, since null-mapped experiments are shown directly)
                         if (step !== null && step !== 'null') {
                             stepsSet.add(step);
                         }
@@ -116,7 +116,7 @@ function parseExpNamesFromFullNames(fullNames) {
     selectedSteps = Array.from(stepsSet);
 }
 
-// 路由管理
+// Route management
 function updateURL(baseline, task, exps, category, page = 1, evaluator = 'gpt') {
     const params = new URLSearchParams();
     if (baseline) params.set('baseline', baseline);
@@ -124,7 +124,7 @@ function updateURL(baseline, task, exps, category, page = 1, evaluator = 'gpt') 
     if (exps && exps.length > 0) params.set('exps', exps.join(','));
     if (category) params.set('category', category);
     if (page && page > 1) params.set('page', page);
-    // 始终写入 evaluator，确保刷新后能正确恢复（默认 gpt 也写入）
+    // Always write evaluator to URL to ensure correct restoration after refresh (also write default 'gpt')
     if (evaluator) params.set('evaluator', evaluator);
     
     const newURL = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
@@ -144,18 +144,18 @@ function parseURL() {
     };
 }
 
-// 从URL加载页面
+// Load page from URL
 async function loadFromURL() {
     const { baseline, task, exps, category, page, evaluator } = parseURL();
     currentEvaluator = evaluator;
     updateEvaluatorButtons();
     
-    // 首先加载baselines
+    // First load baselines
     const baselines = await loadBaselines();
     
     if (baseline) {
         currentBaseline = baseline;
-        // 传入 baselines 参数，确保按钮正确渲染
+        // Pass baselines parameter to ensure buttons render correctly
         renderBaselineButtons(baselines || window.allBaselines || []);
         
         if (task) {
@@ -167,33 +167,33 @@ async function loadFromURL() {
                     currentTask = task;
                     renderButtons('task-buttons', tasks || [],  'task', null);
                     
-                    // 加载实验结构
+                    // Load experiment structure
                     await loadExps(baseline, task);
                     
                     if (exps && exps.length > 0) {
                         try {
-                            // 解析URL中的实验名称，恢复选择的实验基础名称和step
+                            // Parse experiment names from URL, restore selected experiment base names and steps
                             parseExpNamesFromFullNames(exps);
                             
-                            // 验证并更新UI
+                            // Validate and update UI
                             if (expStructure) {
-                                // 验证选中的实验基础名称是否有效
+                                // Validate that selected experiment base names are valid
                                 const validBases = selectedExpBases.filter(b => expStructure.base_names.includes(b));
                                 selectedExpBases = validBases;
                                 
-                                // 验证选中的steps是否有效
+                                // Validate that selected steps are valid
                                 const validSteps = selectedSteps.filter(step => 
                                     expStructure.steps && expStructure.steps.includes(step)
                                 );
                                 selectedSteps = validSteps;
                                 
-                                // 重新组合实验名称
+                                // Re-combine experiment names
                                 combineExpNames();
                                 
-                                // 更新UI
+                                // Update UI
                                 renderExpBaseButtons(expStructure.base_names);
                                 
-                                // 检查是否有需要step的实验
+                                // Check whether any experiment requires a step
                                 let hasStepBasedExps = false;
                                 if (selectedExpBases.length > 0 && expStructure.steps && expStructure.steps.length > 0) {
                                     for (const base of selectedExpBases) {
@@ -211,13 +211,13 @@ async function loadFromURL() {
                                     renderExpStepButtons(expStructure.steps);
                                 } else {
                                     if (selectedExpBases.length > 0) {
-                                        document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">这些实验无需选择step</span>';
+                                        document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">These experiments do not require a step selection</span>';
                                     } else {
-                                        document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">请先选择实验名称</span>';
+                                        document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">Please select an experiment name first</span>';
                                     }
                                 }
                                 
-                                // 加载categories
+                                // Load categories
                                 if (selectedExps.length > 0) {
                                     const firstExp = selectedExps[0];
                                     const catResponse = await fetch(`${API_BASE}/api/categories/${baseline}/${task}/${firstExp}`);
@@ -227,7 +227,7 @@ async function loadFromURL() {
                                     if (category && categories.includes(category)) {
                                         currentCategory = category;
                                         currentPage = page;
-                                        // 更新 category 按钮 active 状态
+                                        // Update category button active state
                                         document.querySelectorAll('#category-buttons .btn').forEach(btn => {
                                             btn.classList.toggle('active', btn.textContent.trim() === category);
                                         });
@@ -237,23 +237,23 @@ async function loadFromURL() {
                                     }
                                 } else {
                                     hideDataAreas();
-                                    document.getElementById('category-buttons').innerHTML = '<span class="empty-state">请先选择实验</span>';
+                                    document.getElementById('category-buttons').innerHTML = '<span class="empty-state">Please select an experiment first</span>';
                                 }
                             } else {
-                                // expStructure 为 null，可能是加载失败
+                                // expStructure is null, possibly a load failure
                                 console.warn('expStructure is null, cannot load data from URL');
                                 hideDataAreas();
-                                document.getElementById('category-buttons').innerHTML = '<span class="empty-state">请先选择实验</span>';
+                                document.getElementById('category-buttons').innerHTML = '<span class="empty-state">Please select an experiment first</span>';
                             }
                         } catch (error) {
                             console.error('Error loading exps from URL:', error);
                             hideDataAreas();
-                            document.getElementById('category-buttons').innerHTML = '<span class="empty-state">请先选择实验</span>';
+                            document.getElementById('category-buttons').innerHTML = '<span class="empty-state">Please select an experiment first</span>';
                         }
                     } else {
-                        // 没有 exps 参数，清空状态
+                        // No exps parameter, clear state
                         hideDataAreas();
-                        document.getElementById('category-buttons').innerHTML = '<span class="empty-state">请先选择实验</span>';
+                        document.getElementById('category-buttons').innerHTML = '<span class="empty-state">Please select an experiment first</span>';
                     }
                 } else {
                     await loadTasks(baseline);
@@ -268,7 +268,7 @@ async function loadFromURL() {
     }
 }
 
-// 隐藏数据区域
+// Hide data areas
 function hideDataAreas() {
     const comparisonArea = document.getElementById('comparison-area');
     if (comparisonArea) comparisonArea.style.display = 'none';
@@ -282,7 +282,7 @@ function hideDataAreas() {
     if (floatingPagination) floatingPagination.style.display = 'none';
 }
 
-// 转义 HTML 并高亮显示 <image X> 标签
+// Escape HTML and highlight <image X> tags
 function formatPrompt(text) {
     if (!text) return 'N/A';
     
@@ -316,7 +316,7 @@ function formatPrompt(text) {
     return escaped;
 }
 
-// 初始化
+// Initialization
 async function init() {
     window.addEventListener('popstate', (event) => {
         if (event.state) {
@@ -336,27 +336,27 @@ async function init() {
     await loadFromURL();
 }
 
-// 加载baselines
+// Load baselines
 async function loadBaselines() {
     try {
         const response = await fetch(`${API_BASE}/api/baselines`);
         const baselines = await response.json();
-        // 保存到全局变量，以便后续使用
+        // Save to global variable for subsequent use
         window.allBaselines = baselines;
         renderBaselineButtons(baselines);
         return baselines;
     } catch (error) {
         console.error('Error loading baselines:', error);
-        document.getElementById('baseline-buttons').innerHTML = '<span class="empty-state">加载失败</span>';
+        document.getElementById('baseline-buttons').innerHTML = '<span class="empty-state">Load failed</span>';
         return [];
     }
 }
 
-// 渲染baseline按钮
+// Render baseline buttons
 function renderBaselineButtons(baselines) {
     const container = document.getElementById('baseline-buttons');
     if (!baselines || baselines.length === 0) {
-        container.innerHTML = '<span class="empty-state">暂无数据</span>';
+        container.innerHTML = '<span class="empty-state">No data available</span>';
         return;
     }
     
@@ -370,20 +370,20 @@ function renderBaselineButtons(baselines) {
     }).join('');
 }
 
-// 加载tasks
+// Load tasks
 async function loadTasks(baseline) {
     try {
         const response = await fetch(`${API_BASE}/api/tasks/${baseline}`);
         const tasks = await response.json();
-        // 将 ours 加入任务列表，与 customization 等使用相同样式
+        // Add 'ours' to the task list using the same style as customization etc.
         renderButtons('task-buttons', tasks || [],  'task', null);
     } catch (error) {
         console.error('Error loading tasks:', error);
-        document.getElementById('task-buttons').innerHTML = '<span class="empty-state">加载失败</span>';
+        document.getElementById('task-buttons').innerHTML = '<span class="empty-state">Load failed</span>';
     }
 }
 
-// 加载exps（改为加载实验结构）
+// Load experiments (changed to loading experiment structure)
 async function loadExps(baseline, task) {
     try {
         const apiUrl = task === 'ours' 
@@ -393,20 +393,20 @@ async function loadExps(baseline, task) {
         expStructure = await response.json();
         
         if (!expStructure || !expStructure.base_names || expStructure.base_names.length === 0) {
-            document.getElementById('exp-base-buttons').innerHTML = '<span class="empty-state">暂无数据</span>';
-            document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">请先选择实验名称</span>';
+            document.getElementById('exp-base-buttons').innerHTML = '<span class="empty-state">No data available</span>';
+            document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">Please select an experiment name first</span>';
             return;
         }
         
-        // 渲染实验基础名称按钮
+        // Render experiment base name buttons
         renderExpBaseButtons(expStructure.base_names);
         
-        // 检查是否有选中的实验基础名称需要step
+        // Check whether any selected experiment base name requires a step
         let hasStepBasedExps = false;
         if (selectedExpBases.length > 0 && expStructure.steps && expStructure.steps.length > 0) {
             for (const base of selectedExpBases) {
                 if (expStructure.exp_map[base]) {
-                    // 检查是否有step（排除None）
+                    // Check whether there is a step (excluding None)
                     const steps = Object.keys(expStructure.exp_map[base]).filter(s => s !== 'null' && s !== null);
                     if (steps.length > 0) {
                         hasStepBasedExps = true;
@@ -416,38 +416,38 @@ async function loadExps(baseline, task) {
             }
         }
         
-        // 如果有需要step的实验，显示step按钮
+        // If any experiment requires a step, show step buttons
         if (hasStepBasedExps) {
-            // 过滤出仍然有效的steps
+            // Filter out steps that are still valid
             const validSteps = selectedSteps.filter(step => 
                 expStructure.steps && expStructure.steps.includes(step)
             );
             selectedSteps = validSteps;
             renderExpStepButtons(expStructure.steps);
         } else {
-            // 清空step选择
+            // Clear step selection
             selectedSteps = [];
             if (selectedExpBases.length > 0) {
-                document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">这些实验无需选择step</span>';
+                document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">These experiments do not require a step selection</span>';
             } else {
-                document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">请先选择实验名称</span>';
+                document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">Please select an experiment name first</span>';
             }
         }
         
-        // 清空category按钮
-        document.getElementById('category-buttons').innerHTML = '<span class="empty-state">请先选择实验</span>';
+        // Clear category buttons
+        document.getElementById('category-buttons').innerHTML = '<span class="empty-state">Please select an experiment first</span>';
     } catch (error) {
         console.error('Error loading exp structure:', error);
-        document.getElementById('exp-base-buttons').innerHTML = '<span class="empty-state">加载失败</span>';
-        document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">加载失败</span>';
+        document.getElementById('exp-base-buttons').innerHTML = '<span class="empty-state">Load failed</span>';
+        document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">Load failed</span>';
     }
 }
 
-// 渲染实验基础名称按钮
+// Render experiment base name buttons
 function renderExpBaseButtons(baseNames) {
     const container = document.getElementById('exp-base-buttons');
     if (!baseNames || baseNames.length === 0) {
-        container.innerHTML = '<span class="empty-state">暂无数据</span>';
+        container.innerHTML = '<span class="empty-state">No data available</span>';
         return;
     }
     
@@ -461,11 +461,11 @@ function renderExpBaseButtons(baseNames) {
     }).join('');
 }
 
-// 渲染step按钮
+// Render step buttons
 function renderExpStepButtons(steps) {
     const container = document.getElementById('exp-step-buttons');
     if (!steps || steps.length === 0) {
-        container.innerHTML = '<span class="empty-state">暂无step数据</span>';
+        container.innerHTML = '<span class="empty-state">No step data available</span>';
         return;
     }
     
@@ -479,7 +479,7 @@ function renderExpStepButtons(steps) {
     }).join('');
 }
 
-// 加载categories
+// Load categories
 async function loadCategories(baseline, task, exp) {
     try {
         const response = await fetch(`${API_BASE}/api/categories/${baseline}/${task}/${exp}`);
@@ -487,15 +487,15 @@ async function loadCategories(baseline, task, exp) {
         renderCategoryButtons(categories);
     } catch (error) {
         console.error('Error loading categories:', error);
-        document.getElementById('category-buttons').innerHTML = '<span class="empty-state">加载失败</span>';
+        document.getElementById('category-buttons').innerHTML = '<span class="empty-state">Load failed</span>';
     }
 }
 
-// 渲染category按钮
+// Render category buttons
 function renderCategoryButtons(categories) {
     const container = document.getElementById('category-buttons');
     if (!categories || categories.length === 0) {
-        container.innerHTML = '<span class="empty-state">暂无数据</span>';
+        container.innerHTML = '<span class="empty-state">No data available</span>';
         return;
     }
     
@@ -517,16 +517,16 @@ function renderCategoryButtons(categories) {
     }).join('');
 }
 
-// 渲染按钮
+// Render buttons
 function renderButtons(containerId, items, type, context) {
     const container = document.getElementById(containerId);
     if (!items || items.length === 0) {
-        container.innerHTML = '<span class="empty-state">暂无数据</span>';
+        container.innerHTML = '<span class="empty-state">No data available</span>';
         return;
     }
 
     if (type === 'exp') {
-        // 多选模式
+        // Multi-select mode
         container.innerHTML = items.map(item => {
             const isSelected = selectedExps.includes(item);
             return `<button class="btn ${isSelected ? 'selected' : ''}" 
@@ -547,7 +547,7 @@ function renderButtons(containerId, items, type, context) {
     }
 }
 
-// 选择baseline
+// Select baseline
 async function selectBaseline(baseline, updateUrl = true) {
     if (currentBaseline === baseline) return;
     
@@ -560,7 +560,7 @@ async function selectBaseline(baseline, updateUrl = true) {
     expStructure = null;
     currentPage = 1;
     
-    // 更新baseline按钮的active状态
+    // Update baseline button active state
     const baselineButtons = document.querySelectorAll('#baseline-buttons .btn');
     baselineButtons.forEach(btn => {
         const btnBaseline = btn.getAttribute('data-baseline') || btn.textContent.trim();
@@ -571,13 +571,13 @@ async function selectBaseline(baseline, updateUrl = true) {
         }
     });
     
-    // 清空其他选择
-    document.getElementById('exp-base-buttons').innerHTML = '<span class="empty-state">请先选择任务</span>';
-    document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">请先选择实验名称</span>';
-    document.getElementById('category-buttons').innerHTML = '<span class="empty-state">请先选择实验</span>';
+    // Clear other selections
+    document.getElementById('exp-base-buttons').innerHTML = '<span class="empty-state">Please select a task first</span>';
+    document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">Please select an experiment name first</span>';
+    document.getElementById('category-buttons').innerHTML = '<span class="empty-state">Please select an experiment first</span>';
     hideDataAreas();
     
-    // 加载任务
+    // Load tasks
     await loadTasks(baseline);
     
     if (updateUrl) {
@@ -585,9 +585,9 @@ async function selectBaseline(baseline, updateUrl = true) {
     }
 }
 
-// 选择task
+// Select task
 async function selectTask(task, updateUrl = true) {
-    // 保存之前的选择状态
+    // Save previous selection state
     const previousExpBases = [...selectedExpBases];
     const previousSteps = [...selectedSteps];
     const previousCategory = currentCategory;
@@ -596,7 +596,7 @@ async function selectTask(task, updateUrl = true) {
     expStructure = null;
     currentPage = 1;
     
-    // 更新任务按钮的 active 状态（ours 与其他任务使用相同样式）
+    // Update task button active state (ours uses the same style as other tasks)
     const taskButtons = document.querySelectorAll('#task-buttons .btn');
     taskButtons.forEach(btn => {
         const btnTask = btn.getAttribute('data-task') || btn.textContent.trim();
@@ -607,7 +607,7 @@ async function selectTask(task, updateUrl = true) {
         }
     });
     
-    // Ours 视图：特殊处理（无需 category）
+    // Ours view: special handling (no category needed)
     if (task === 'ours') {
         await loadExps(currentBaseline, 'ours');
         if (expStructure && previousExpBases.length > 0) {
@@ -631,7 +631,7 @@ async function selectTask(task, updateUrl = true) {
                 } else {
                     selectedSteps = [];
                     document.getElementById('exp-step-buttons').innerHTML = selectedExpBases.length > 0 
-                        ? '<span class="empty-state">这些实验无需选择step</span>' : '<span class="empty-state">请先选择实验名称</span>';
+                        ? '<span class="empty-state">These experiments do not require a step selection</span>' : '<span class="empty-state">Please select an experiment name first</span>';
                 }
                 combineExpNames();
                 if (selectedExps.length > 0) {
@@ -649,17 +649,17 @@ async function selectTask(task, updateUrl = true) {
         return;
     }
     
-    // 加载新任务的实验结构
+    // Load experiment structure for new task
     await loadExps(currentBaseline, task);
     
-    // 尝试恢复之前选择的实验基础名称（如果它们在新任务下也存在）
+    // Try to restore previously selected experiment base names (if they exist under the new task)
     if (expStructure && previousExpBases.length > 0) {
         const validBases = previousExpBases.filter(base => expStructure.base_names.includes(base));
         if (validBases.length > 0) {
             selectedExpBases = validBases;
             renderExpBaseButtons(expStructure.base_names);
             
-            // 检查是否需要step
+            // Check whether a step is needed
             let hasStepBasedExps = false;
             if (expStructure.steps && expStructure.steps.length > 0) {
                 for (const base of selectedExpBases) {
@@ -673,9 +673,9 @@ async function selectTask(task, updateUrl = true) {
                 }
             }
             
-            // 如果之前选择的steps仍然有效，尝试恢复
+            // If previously selected steps are still valid, try to restore them
             if (hasStepBasedExps) {
-                // 过滤出在新任务下仍然有效的steps
+                // Filter steps that are still valid under the new task
                 const validSteps = previousSteps.filter(step => 
                     expStructure.steps && expStructure.steps.includes(step)
                 );
@@ -684,16 +684,16 @@ async function selectTask(task, updateUrl = true) {
             } else {
                 selectedSteps = [];
                 if (selectedExpBases.length > 0) {
-                    document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">这些实验无需选择step</span>';
+                    document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">These experiments do not require a step selection</span>';
                 } else {
-                    document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">请先选择实验名称</span>';
+                    document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">Please select an experiment name first</span>';
                 }
             }
             
-            // 组合实验名称
+            // Combine experiment names
             combineExpNames();
             
-            // 如果有选中的实验，尝试恢复类别选择
+            // If there are selected experiments, try to restore category selection
             if (selectedExps.length > 0) {
                 const firstExp = selectedExps[0];
                 const catResponse = await fetch(`${API_BASE}/api/categories/${currentBaseline}/${task}/${firstExp}`);
@@ -712,25 +712,25 @@ async function selectTask(task, updateUrl = true) {
                 }
             } else {
                 currentCategory = null;
-                document.getElementById('category-buttons').innerHTML = '<span class="empty-state">请先选择实验</span>';
+                document.getElementById('category-buttons').innerHTML = '<span class="empty-state">Please select an experiment first</span>';
                 hideDataAreas();
             }
         } else {
-            // 如果之前的实验基础名称在新任务下都不存在，清空选择
+            // If none of the previous experiment base names exist under the new task, clear selection
             selectedExpBases = [];
             selectedSteps = [];
             selectedExps = [];
             currentCategory = null;
-            document.getElementById('category-buttons').innerHTML = '<span class="empty-state">请先选择实验</span>';
+            document.getElementById('category-buttons').innerHTML = '<span class="empty-state">Please select an experiment first</span>';
             hideDataAreas();
         }
     } else {
-        // 如果没有之前的选择，清空
+        // If there is no previous selection, clear
         selectedExpBases = [];
         selectedSteps = [];
         selectedExps = [];
         currentCategory = null;
-        document.getElementById('category-buttons').innerHTML = '<span class="empty-state">请先选择实验</span>';
+        document.getElementById('category-buttons').innerHTML = '<span class="empty-state">Please select an experiment first</span>';
         hideDataAreas();
     }
     
@@ -739,7 +739,7 @@ async function selectTask(task, updateUrl = true) {
     }
 }
 
-// 选择evaluator
+// Select evaluator
 async function selectEvaluator(evaluator) {
     if (evaluator !== 'gpt' && evaluator !== 'gemini') {
         return;
@@ -747,7 +747,7 @@ async function selectEvaluator(evaluator) {
     currentEvaluator = evaluator;
     updateEvaluatorButtons();
     
-    // 如果有选中的实验和category，重新加载数据
+    // If there are selected experiments and a category, reload data
     if (currentBaseline && currentTask && selectedExps.length > 0 && currentCategory) {
         await loadData();
     }
@@ -755,7 +755,7 @@ async function selectEvaluator(evaluator) {
     updateURL(currentBaseline, currentTask, selectedExps, currentCategory, currentPage, currentEvaluator);
 }
 
-// 更新evaluator按钮状态
+// Update evaluator button state
 function updateEvaluatorButtons() {
     const buttons = document.querySelectorAll('#evaluator-buttons .btn');
     buttons.forEach(btn => {
@@ -770,9 +770,9 @@ function updateEvaluatorButtons() {
     });
 }
 
-// 切换实验基础名称（多选）
+// Toggle experiment base name (multi-select)
 async function toggleExpBase(baseName) {
-    // 保存之前的steps和category选择
+    // Save previous steps and category selection
     const previousSteps = [...selectedSteps];
     const previousCategory = currentCategory;
     
@@ -783,16 +783,16 @@ async function toggleExpBase(baseName) {
         selectedExpBases.push(baseName);
     }
     
-    // 重新渲染按钮
+    // Re-render buttons
     if (expStructure) {
         renderExpBaseButtons(expStructure.base_names);
         
-        // 检查是否有选中的实验基础名称需要step
+        // Check whether any selected experiment base name requires a step
         let hasStepBasedExps = false;
         if (selectedExpBases.length > 0 && expStructure.steps && expStructure.steps.length > 0) {
             for (const base of selectedExpBases) {
                 if (expStructure.exp_map[base]) {
-                    // 检查是否有step（排除None）
+                    // Check whether there is a step (excluding None)
                     const steps = Object.keys(expStructure.exp_map[base]).filter(s => s !== 'null' && s !== null);
                     if (steps.length > 0) {
                         hasStepBasedExps = true;
@@ -802,9 +802,9 @@ async function toggleExpBase(baseName) {
             }
         }
         
-        // 如果有需要step的实验，显示step按钮
+        // If any experiment requires a step, show step buttons
         if (hasStepBasedExps) {
-            // 过滤出仍然有效的steps（即所有选中的实验基础名称都有这个step）
+            // Filter steps still valid (i.e. all selected experiment base names have this step)
             const validSteps = previousSteps.filter(step => {
                 if (!expStructure.steps || !expStructure.steps.includes(step)) {
                     return false;
@@ -819,28 +819,28 @@ async function toggleExpBase(baseName) {
             selectedSteps = validSteps;
             renderExpStepButtons(expStructure.steps);
         } else {
-            // 如果所有实验都不需要step，清空step选择
+            // If no experiment requires a step, clear step selection
             selectedSteps = [];
             if (selectedExpBases.length > 0) {
-                document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">这些实验无需选择step</span>';
+                document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">These experiments do not require a step selection</span>';
             } else {
-                document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">请先选择实验名称</span>';
+                document.getElementById('exp-step-buttons').innerHTML = '<span class="empty-state">Please select an experiment name first</span>';
             }
         }
     }
     
-    // 更新完整的实验名称列表
+    // Update the full experiment name list
     combineExpNames();
     
-    // 如果有选中的实验，尝试保持类别选择
+    // If there are selected experiments, try to keep category selection
     if (selectedExps.length > 0) {
         const firstExp = selectedExps[0];
-        // 尝试保持之前选择的类别
+        // Try to keep previously selected category
         const catResponse = await fetch(`${API_BASE}/api/categories/${currentBaseline}/${currentTask}/${firstExp}`);
         const categories = await catResponse.json();
         renderCategoryButtons(categories);
         
-        // 优先使用previousCategory，如果没有则使用currentCategory
+        // Prefer previousCategory; fall back to currentCategory if absent
         const categoryToCheck = previousCategory || currentCategory;
         if (categoryToCheck && categories.includes(categoryToCheck)) {
             currentCategory = categoryToCheck;
@@ -853,12 +853,12 @@ async function toggleExpBase(baseName) {
             hideDataAreas();
         }
     } else {
-        // 如果没有选中的实验，但之前有类别选择，保持类别选择（等待用户选择实验）
+        // If no experiments are selected but there was a previous category, keep the category (waiting for user to select an experiment)
         if (currentCategory) {
-            // 保持类别选择，但不显示数据
+            // Keep category selection but do not display data
             hideDataAreas();
         } else {
-            document.getElementById('category-buttons').innerHTML = '<span class="empty-state">请先选择实验</span>';
+            document.getElementById('category-buttons').innerHTML = '<span class="empty-state">Please select an experiment first</span>';
             hideDataAreas();
         }
     }
@@ -866,13 +866,13 @@ async function toggleExpBase(baseName) {
     updateURL(currentBaseline, currentTask, selectedExps, currentCategory, currentPage, currentEvaluator);
 }
 
-// 切换step（多选）
+// Toggle step (multi-select)
 async function toggleStep(step) {
-    // 保存之前的类别选择和页码
+    // Save previous category selection and page number
     const previousCategory = currentCategory;
     const previousPage = currentPage;
     
-    // 切换step选择
+    // Toggle step selection
     const index = selectedSteps.indexOf(step);
     if (index > -1) {
         selectedSteps.splice(index, 1);
@@ -880,22 +880,22 @@ async function toggleStep(step) {
         selectedSteps.push(step);
     }
     
-    // 重新渲染step按钮
+    // Re-render step buttons
     if (expStructure && expStructure.steps) {
         renderExpStepButtons(expStructure.steps);
     }
     
-    // 更新完整的实验名称列表
+    // Update the full experiment name list
     combineExpNames();
     
-    // 如果有选中的实验，尝试保持类别选择
+    // If there are selected experiments, try to keep category selection
     if (selectedExps.length > 0) {
         const firstExp = selectedExps[0];
         const catResponse = await fetch(`${API_BASE}/api/categories/${currentBaseline}/${currentTask}/${firstExp}`);
         const categories = await catResponse.json();
         renderCategoryButtons(categories);
         
-        // 优先使用previousCategory，如果没有则使用currentCategory
+        // Prefer previousCategory; fall back to currentCategory if absent
         const categoryToCheck = previousCategory || currentCategory;
         if (categoryToCheck && categories.includes(categoryToCheck)) {
             currentCategory = categoryToCheck;
@@ -909,11 +909,11 @@ async function toggleStep(step) {
             hideDataAreas();
         }
     } else {
-        // 如果没有选中的实验
+        // If no experiments are selected
         if (currentCategory) {
             hideDataAreas();
         } else {
-            document.getElementById('category-buttons').innerHTML = '<span class="empty-state">请先选择实验</span>';
+            document.getElementById('category-buttons').innerHTML = '<span class="empty-state">Please select an experiment first</span>';
             hideDataAreas();
         }
     }
@@ -921,12 +921,12 @@ async function toggleStep(step) {
     updateURL(currentBaseline, currentTask, selectedExps, currentCategory, currentPage, currentEvaluator);
 }
 
-// 选择category
+// Select category
 async function selectCategory(category) {
     currentCategory = category;
     currentPage = 1;
     
-    // 更新category按钮的active状态
+    // Update category button active state
     const categoryButtons = document.querySelectorAll('#category-buttons .btn');
     categoryButtons.forEach(btn => {
         const btnCategory = btn.textContent.trim();
@@ -937,7 +937,7 @@ async function selectCategory(category) {
         }
     });
     
-    // 加载数据
+    // Load data
     if (currentBaseline && currentTask && selectedExps.length > 0) {
         await loadData();
     }
@@ -945,40 +945,40 @@ async function selectCategory(category) {
     updateURL(currentBaseline, currentTask, selectedExps, category, 1, currentEvaluator);
 }
 
-// 加载数据
+// Load data
 async function loadData() {
     if (!currentBaseline || !currentTask || selectedExps.length === 0) return;
     
-    // Ours 视图：仅加载聚合得分，无样例
+    // Ours view: only load aggregated scores, no samples
     if (currentTask === 'ours') {
         await loadOursData();
         return;
     }
     
-    // 常规任务需要 category
+    // Regular tasks require a category
     if (!currentCategory) return;
 
-    // 加载对比统计
+    // Load comparison statistics
     await loadComparison();
     
-    // 隐藏 benchmark 区域（已不支持）
+    // Hide benchmark area (no longer supported)
     const benchmarkEl = document.getElementById('benchmark-area');
     if (benchmarkEl) benchmarkEl.style.display = 'none';
     
-    // 加载样本列表
+    // Load sample list
     await loadSamples();
 }
 
 
-// 渲染benchmark分数表格
+// Render benchmark score table
 function renderBenchmarkScores(data) {
     const container = document.getElementById('benchmark-area');
     if (!container) return;
     
-    // 对选中的实验进行自然排序
+    // Natural-sort the selected experiments
     const sortedExps = getSortedExps(selectedExps);
     
-    let html = '<div class="benchmark-title">Benchmark 评测结果</div>';
+    let html = '<div class="benchmark-title">Benchmark evaluation results</div>';
     
     for (const benchmarkData of data.comparison_data) {
         const benchmark = benchmarkData.benchmark;
@@ -987,7 +987,7 @@ function renderBenchmarkScores(data) {
         html += `<div class="benchmark-section">`;
         html += `<div class="benchmark-name">${benchmark.toUpperCase()}</div>`;
         html += '<div class="benchmark-table-container"><table class="benchmark-table">';
-        html += '<thead><tr><th>指标</th>';
+        html += '<thead><tr><th>Metric</th>';
         sortedExps.forEach(exp => {
             html += `<th class="exp-header">${exp}</th>`;
         });
@@ -995,7 +995,7 @@ function renderBenchmarkScores(data) {
         
         for (const [metricName, expValues] of Object.entries(metrics)) {
             html += '<tr>';
-            // 格式化指标名称
+            // Format metric name
             const formattedName = metricName.split('_').map(word => 
                 word.charAt(0).toUpperCase() + word.slice(1)
             ).join(' ');
@@ -1008,7 +1008,7 @@ function renderBenchmarkScores(data) {
                     if (typeof value === 'number') {
                         displayValue = value.toFixed(2);
                     } else if (typeof value === 'object') {
-                        // 处理对象类型的值（如 {mean: 0.95, count: 100}）
+                        // Handle object-type values (e.g. {mean: 0.95, count: 100})
                         if (value.mean !== undefined) {
                             displayValue = value.mean.toFixed(2);
                             if (value.count !== undefined) {
@@ -1033,7 +1033,7 @@ function renderBenchmarkScores(data) {
     container.innerHTML = html;
 }
 
-// 加载 Ours 视图数据
+// Load Ours view data
 async function loadOursData() {
     try {
         const expsParam = selectedExps.join(',');
@@ -1061,9 +1061,9 @@ async function loadOursData() {
     }
 }
 
-// 加载 Ours 页面下的第三方评测数据（支持多选）
+// Load third-party evaluation data for the Ours page (supports multi-select)
 
-// 统一格式化数字为 2 位小数
+// Uniformly format numbers to 2 decimal places
 function formatScore(val) {
     if (val === undefined || val === null) return 'N/A';
     if (typeof val === 'number' && !isNaN(val)) return val.toFixed(2);
@@ -1074,9 +1074,9 @@ function formatScore(val) {
     return String(val);
 }
 
-// 渲染多个 Ours 第三方评测表格
+// Render multiple Ours third-party evaluation tables
 
-// 渲染单个 Ours 第三方评测表格（可折叠）
+// Render a single Ours third-party evaluation table (collapsible)
 function renderSingleOursBenchmarkBlock(data) {
     const benchmark = data.benchmark || '';
     const table = data.comparison_table || [];
@@ -1085,10 +1085,10 @@ function renderSingleOursBenchmarkBlock(data) {
     if (table.length === 0) return '';
     
     const avgRow = table.find(r => (r.metric_name || '').toLowerCase() === 'average');
-    const sampleCountRow = table.find(r => (r.metric_name || '').includes('样本数'));
+    const sampleCountRow = table.find(r => (r.metric_name || '').includes('Sample count'));
     const detailRows = table.filter(r => {
         const name = (r.metric_name || '').toLowerCase();
-        return name !== 'average' && !(r.metric_name || '').includes('样本数');
+        return name !== 'average' && !(r.metric_name || '').includes('Sample count');
     });
     const hasDetails = detailRows.length > 0;
     const safeId = benchmark.replace(/[^a-z0-9]/gi, '_');
@@ -1113,8 +1113,8 @@ function renderSingleOursBenchmarkBlock(data) {
     let blockHtml = `<div class="ours-benchmark-block">`;
     blockHtml += `<div class="ours-benchmark-header" onclick="toggleOursBenchmarkExpand('${safeId}')">`;
     blockHtml += `<span class="expand-icon" id="ours-benchmark-expand-icon-${safeId}">${hasDetails ? '▶' : ''}</span> `;
-    blockHtml += `${benchmark.toUpperCase()} 评测结果</div>`;
-    blockHtml += `<div class="ours-benchmark-table-wrap"><table class="ours-table ours-benchmark-table"><thead><tr><th>指标</th>`;
+    blockHtml += `${benchmark.toUpperCase()} Evaluation results</div>`;
+    blockHtml += `<div class="ours-benchmark-table-wrap"><table class="ours-table ours-benchmark-table"><thead><tr><th>Metric</th>`;
     sortedExps.forEach(exp => { blockHtml += `<th class="exp-header">${exp}</th>`; });
     blockHtml += '</tr></thead><tbody>';
     
@@ -1135,7 +1135,7 @@ function renderSingleOursBenchmarkBlock(data) {
     }
     if (sampleCountRow) {
         blockHtml += '<tr class="benchmark-sample-row">';
-        blockHtml += `<td class="metric-name">${sampleCountRow.metric_name || '样本数'}</td>`;
+        blockHtml += `<td class="metric-name">${sampleCountRow.metric_name || 'Sample count'}</td>`;
         sortedExps.forEach(exp => {
             const v = sampleCountRow[exp];
             blockHtml += `<td class="metric-value">${v !== undefined && v !== null && v !== 'N/A' ? v : (typeof v === 'object' ? 'N/A' : (v || 'N/A'))}</td>`;
@@ -1159,16 +1159,16 @@ function renderSingleOursBenchmarkBlock(data) {
     return blockHtml;
 }
 
-// 切换 Ours 第三方评测详情的展开/收起
+// Toggle expand/collapse for Ours third-party evaluation details
 
-// 渲染 Ours 得分表格（支持点击任务展开 category 详情）
+// Render Ours score table (supports clicking tasks to expand category details)
 function renderOursScores(data) {
     const container = document.getElementById('ours-table-container');
     if (!container) return;
     
     const sortedExps = getSortedExps(data.exps || selectedExps);
     
-    let html = '<table class="ours-table"><thead><tr><th>任务 / 指标</th>';
+    let html = '<table class="ours-table"><thead><tr><th>Task / Metric</th>';
     sortedExps.forEach(exp => {
         html += `<th class="exp-header">${exp}</th>`;
     });
@@ -1231,7 +1231,7 @@ function renderOursScores(data) {
     container.innerHTML = html;
 }
 
-// 切换 Ours 任务行的展开/收起
+// Toggle expand/collapse for Ours task rows
 function toggleOursTaskExpand(idx) {
     const detailRows = document.querySelectorAll('.ours-expand-' + idx);
     const taskRow = document.querySelector('.task-row[data-task-idx="' + idx + '"]');
@@ -1251,7 +1251,7 @@ function toggleOursTaskExpand(idx) {
     }
 }
 
-// 加载对比统计
+// Load comparison statistics
 async function loadComparison() {
     try {
         const expsParam = selectedExps.join(',');
@@ -1267,20 +1267,20 @@ async function loadComparison() {
     }
 }
 
-// 渲染对比统计
+// Render comparison statistics
 function renderComparison(comparison) {
     const table = document.getElementById('comparison-table');
     const thead = table.querySelector('thead tr');
     const tbody = table.querySelector('tbody');
     
-    // 清空表头和数据
-    thead.innerHTML = '<th>指标</th>';
+    // Clear header and data
+    thead.innerHTML = '<th>Metric</th>';
     tbody.innerHTML = '';
     
-    // 对选中的实验进行自然排序
+    // Natural-sort the selected experiments
     const sortedExps = getSortedExps(selectedExps);
     
-    // 添加实验列
+    // Add experiment columns
     sortedExps.forEach(exp => {
         const th = document.createElement('th');
         th.className = 'exp-header';
@@ -1288,33 +1288,33 @@ function renderComparison(comparison) {
         thead.appendChild(th);
     });
     
-    // 格式化指标名称（首字母大写，下划线替换为空格）
+    // Format metric name (capitalize first letter, replace underscores with spaces)
     const formatMetricName = (name) => {
         return name.split('_').map(word => 
             word.charAt(0).toUpperCase() + word.slice(1)
         ).join(' ');
     };
     
-    // 添加数据行
+    // Add data rows
     if (comparison.comparison_table && comparison.comparison_table.length > 0) {
         comparison.comparison_table.forEach(row => {
             const tr = document.createElement('tr');
             
-            // 指标名称（格式化显示）
+            // Metric name (formatted display)
             const metricTd = document.createElement('td');
             metricTd.className = 'metric-name';
             const metricName = row.metric_name || row.metric || '';
             metricTd.textContent = formatMetricName(metricName);
             tr.appendChild(metricTd);
             
-            // 各实验的值（使用排序后的顺序）
+            // Values for each experiment (using sorted order)
             sortedExps.forEach(exp => {
                 const valueTd = document.createElement('td');
                 valueTd.className = 'metric-value';
                 const value = row[exp];
                 if (value !== undefined && value !== null) {
                     if (typeof value === 'object' && value.mean !== undefined) {
-                        valueTd.textContent = `${formatScore(value.mean)} (中位数: ${formatScore(value.median)})`;
+                        valueTd.textContent = `${formatScore(value.mean)} (median: ${formatScore(value.median)})`;
                     } else {
                         valueTd.textContent = typeof value === 'number' ? formatScore(value) : value;
                     }
@@ -1328,15 +1328,15 @@ function renderComparison(comparison) {
         });
     }
     
-    // 添加评估器标识到表格标题
+    // Add evaluator label to table title
     const comparisonTitle = document.querySelector('.comparison-title');
     if (comparisonTitle) {
         const evaluatorLabel = currentEvaluator === 'gpt' ? 'GPT-4o' : 'Gemini';
-        comparisonTitle.textContent = `实验对比统计 (${evaluatorLabel} 评分) - ${currentBaseline}`;
+        comparisonTitle.textContent = `Experiment Comparison Statistics (${evaluatorLabel} scoring) - ${currentBaseline}`;
     }
 }
 
-// 加载样本列表
+// Load sample list
 async function loadSamples() {
     try {
         const expsParam = selectedExps.join(',');
@@ -1345,7 +1345,7 @@ async function loadSamples() {
         
         if (data && data.samples) {
             sampleIds = data.sample_ids || [];
-            // 保存指标名称到全局变量
+            // Save metric names to global variable
             window.metric1Name = data.metric1_name || 'metric1';
             window.metric2Name = data.metric2_name || 'metric2';
             renderSamples(data.samples);
@@ -1357,66 +1357,66 @@ async function loadSamples() {
     }
 }
 
-// 渲染样本
+// Render samples
 function renderSamples(samples) {
     const list = document.getElementById('samples-list');
     
     if (!samples || samples.length === 0) {
-        list.innerHTML = '<div class="empty-state">暂无样本数据</div>';
+        list.innerHTML = '<div class="empty-state">No sample data available</div>';
         return;
     }
     
     list.innerHTML = samples.map(sample => renderSample(sample)).join('');
 }
 
-// 渲染单个样本
+// Render a single sample
 function renderSample(sample) {
-    // 对选中的实验进行自然排序
+    // Natural-sort the selected experiments
     const sortedExps = getSortedExps(selectedExps);
     
-    // 获取instruction（从第一个实验获取，应该都一样）
+    // Get instruction (from first experiment; should be the same for all)
     const firstExp = sortedExps[0];
     const instruction = sample.instruction || 'N/A';
     const inputImages = sample.input_images || [];
     const targetImage = sample.target_image;
     
-    // 渲染输入图像
+    // Render input images
     const inputImagesHtml = inputImages.map((img, idx) => `
         <div class="image-wrapper input">
             <img src="${API_BASE}/api/image?path=${encodeURIComponent(img)}" 
-                 alt="输入图像 ${idx + 1}" 
-                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3E图片加载失败%3C/text%3E%3C/svg%3E'">
-            <div class="image-label">输入 ${idx + 1}</div>
+                 alt="Input image ${idx + 1}" 
+                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3EImage failed to load%3C/text%3E%3C/svg%3E'">
+            <div class="image-label">Input ${idx + 1}</div>
         </div>
     `).join('');
     
-    // 渲染目标图像（如果有）
+    // Render target image (if present)
     const targetImageHtml = targetImage ? `
         <div class="image-wrapper target">
             <img src="${API_BASE}/api/image?path=${encodeURIComponent(targetImage)}" 
-                 alt="目标图像" 
-                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3E图片加载失败%3C/text%3E%3C/svg%3E'">
-            <div class="image-label">目标图像</div>
+                 alt="Target image" 
+                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3EImage failed to load%3C/text%3E%3C/svg%3E'">
+            <div class="image-label">Target image</div>
         </div>
     ` : '';
     
-    // 渲染各实验的输出（使用排序后的顺序）
+    // Render outputs for each experiment (using sorted order)
     const experimentsHtml = sortedExps.map(exp => {
         const expData = sample.experiments && sample.experiments[exp];
         if (!expData) {
             return `
                 <div class="experiment-block">
                     <div class="experiment-header">${exp}</div>
-                    <div class="empty-state">无数据</div>
+                    <div class="empty-state">No data</div>
                 </div>
             `;
         }
         
-        // 获取指标名称（从全局变量或使用默认值）
+        // Get metric names (from global variable or use default)
         const metric1Name = window.metric1Name || 'metric1';
         const metric2Name = window.metric2Name || 'metric2';
         
-        // 格式化指标名称（首字母大写，下划线替换为空格）
+        // Format metric name (capitalize first letter, replace underscores with spaces)
         const formatMetricName = (name) => {
             return name.split('_').map(word => 
                 word.charAt(0).toUpperCase() + word.slice(1)
@@ -1425,20 +1425,20 @@ function renderSample(sample) {
         
         const evaluatorLabel = currentEvaluator === 'gpt' ? 'GPT-4o' : 'Gemini';
         
-        // 单图像任务
+        // Single-image task
         const outputImage = expData.output_image || '';
         
-        // 区分0分和None（无评分）：0分显示为"0"，None显示为"N/A"
+        // Distinguish between score 0 and None (no score): 0 shows as "0", None shows as "N/A"
         const metric1Score = (expData.metric1_score !== undefined && expData.metric1_score !== null) ? expData.metric1_score : 'N/A';
         const metric2Score = (expData.metric2_score !== undefined && expData.metric2_score !== null) ? expData.metric2_score : 'N/A';
         const reasoning = expData.reasoning || '';
         
-        // 对于customization任务，显示consistency_scores_list（如果有）
+        // For customization task, show consistency_scores_list (if available)
         let consistencyScoresListHtml = '';
         if (expData.consistency_scores_list && Array.isArray(expData.consistency_scores_list) && expData.consistency_scores_list.length > 0) {
             consistencyScoresListHtml = `
                 <div class="score-item-detail" style="font-size: 0.85em; color: #666; margin-top: 5px;">
-                    原始得分: [${expData.consistency_scores_list.join(', ')}]
+                    Raw scores: [${expData.consistency_scores_list.join(', ')}]
                 </div>
             `;
         }
@@ -1450,27 +1450,27 @@ function renderSample(sample) {
                     ${outputImage ? `
                         <div class="image-wrapper output">
                             <img src="${API_BASE}/api/image?path=${encodeURIComponent(outputImage)}" 
-                                 alt="生成图像" 
-                                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3E图片加载失败%3C/text%3E%3C/svg%3E'">
-                            <div class="image-label">生成图像</div>
+                                 alt="Generated image" 
+                                 onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\'%3EImage failed to load%3C/text%3E%3C/svg%3E'">
+                            <div class="image-label">Generated image</div>
                         </div>
-                    ` : '<div class="empty-state">无输出图像</div>'}
+                    ` : '<div class="empty-state">No output image</div>'}
                 </div>
                 <div class="experiment-scores">
                     <div class="score-item">
                         <div class="score-item-label">${formatMetricName(metric1Name)}</div>
-                        <div class="score-item-value ${metric1Score === 'FAILED' ? 'failed' : ''}">${metric1Score === 'FAILED' ? '评分失败' : metric1Score}</div>
+                        <div class="score-item-value ${metric1Score === 'FAILED' ? 'failed' : ''}">${metric1Score === 'FAILED' ? 'Scoring failed' : metric1Score}</div>
                         ${consistencyScoresListHtml}
                     </div>
                     <div class="score-item">
                         <div class="score-item-label">${formatMetricName(metric2Name)}</div>
-                        <div class="score-item-value ${metric2Score === 'FAILED' ? 'failed' : ''}">${metric2Score === 'FAILED' ? '评分失败' : metric2Score}</div>
+                        <div class="score-item-value ${metric2Score === 'FAILED' ? 'failed' : ''}">${metric2Score === 'FAILED' ? 'Scoring failed' : metric2Score}</div>
                     </div>
                 </div>
                 ${reasoning ? `
                     <div class="reasoning-section">
                         <button class="reasoning-toggle" onclick="toggleReasoning(this)">
-                            显示/隐藏 ${evaluatorLabel} 理由
+                            Show/Hide ${evaluatorLabel} reasoning
                         </button>
                         <div class="reasoning-content">
                             ${reasoning}
@@ -1481,7 +1481,7 @@ function renderSample(sample) {
         `;
     }).join('');
     
-    // 构建图片展示区域
+    // Build image display area
     let imagesSection = '';
     if (inputImagesHtml) {
         imagesSection += `<div class="input-images-container">${inputImagesHtml}</div>`;
@@ -1508,13 +1508,13 @@ function renderSample(sample) {
     `;
 }
 
-// 切换理由显示
+// Toggle reasoning display
 function toggleReasoning(button) {
     const content = button.nextElementSibling;
     content.classList.toggle('show');
 }
 
-// 渲染分页
+// Render pagination
 function renderPagination(totalPagesParam, currentPageNum) {
     const pagination = document.getElementById('pagination');
     const floatingPagination = document.getElementById('floating-pagination');
@@ -1534,27 +1534,27 @@ function renderPagination(totalPagesParam, currentPageNum) {
         return;
     }
 
-    // 更新顶部分页
+    // Update top pagination
     pagination.innerHTML = `
         <button class="pagination-btn ${currentPage === 1 ? 'disabled' : ''}" 
                 onclick="changePage(${currentPage - 1})" 
                 ${currentPage === 1 ? 'disabled' : ''}>
-            上一页
+            Previous
         </button>
-        <span class="page-info">第 ${currentPage} / ${totalPages} 页</span>
+        <span class="page-info">Page ${currentPage} / ${totalPages}</span>
         <button class="pagination-btn ${currentPage === totalPages ? 'disabled' : ''}" 
                 onclick="changePage(${currentPage + 1})" 
                 ${currentPage === totalPages ? 'disabled' : ''}>
-            下一页
+            Next
         </button>
     `;
     
-    // 更新浮动分页按钮
+    // Update floating pagination buttons
     if (floatingPagination) {
         floatingPagination.style.display = 'flex';
         floatingPageText.textContent = `${currentPage} / ${totalPages}`;
         
-        // 更新上一页按钮
+        // Update previous-page button
         if (floatingPrevBtn) {
             if (currentPage === 1) {
                 floatingPrevBtn.disabled = true;
@@ -1563,7 +1563,7 @@ function renderPagination(totalPagesParam, currentPageNum) {
             }
         }
         
-        // 更新下一页按钮
+        // Update next-page button
         if (floatingNextBtn) {
             if (currentPage === totalPages) {
                 floatingNextBtn.disabled = true;
@@ -1574,7 +1574,7 @@ function renderPagination(totalPagesParam, currentPageNum) {
     }
 }
 
-// 切换页面
+// Change page
 function changePage(page) {
     if (page < 1 || page > totalPages) return;
     currentPage = page;
@@ -1583,5 +1583,5 @@ function changePage(page) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// 页面加载时初始化
+// Initialize on page load
 init();

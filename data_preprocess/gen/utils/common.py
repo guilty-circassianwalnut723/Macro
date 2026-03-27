@@ -1,5 +1,5 @@
 """
-通用工具函数
+Common utility functions
 """
 
 import json
@@ -9,7 +9,7 @@ from typing import Dict, Set, Optional, Union, Tuple, List
 
 
 def get_image_count_category(image_count: int) -> str:
-    """根据图像数量返回类别目录名"""
+    """Return category directory name based on image count"""
     if image_count <= 3:
         return "1-3"
     elif image_count <= 5:
@@ -27,16 +27,16 @@ def load_generated_ids(
     sub_type: Optional[str] = None
 ) -> Set[str]:
     """
-    加载已生成的样本唯一识别编号集合
+    Load the set of already-generated sample unique IDs
     
     Args:
-        task_dir: task目录，例如 final/customization
-        split_type: "train" 或 "eval"
-        image_count_category: 图像数量类别，例如 "1-3"
-        sub_type: 子类型（可选）
+        task_dir: task directory, e.g. final/customization
+        split_type: "train" or "eval"
+        image_count_category: image count category, e.g. "1-3"
+        sub_type: subtype (optional)
     
     Returns:
-        已生成的唯一识别编号集合
+        set of already-generated unique IDs
     """
     generated_ids = set()
 
@@ -55,7 +55,7 @@ def load_generated_ids(
                 if unique_id:
                     generated_ids.add(unique_id)
         except Exception as e:
-            print(f"警告: 读取JSON文件失败 {json_file}: {e}")
+            print(f"Warning: failed to read JSON file {json_file}: {e}")
             continue
 
     return generated_ids
@@ -67,7 +67,7 @@ def load_all_generated_ids(
     sub_type: Optional[str] = None
 ) -> Set[str]:
     """
-    加载整个 split_type 目录下所有 category 的已生成样本唯一识别编号集合
+    Load the set of already-generated unique IDs for all categories under the split_type directory
     """
     generated_ids = set()
 
@@ -95,13 +95,13 @@ def load_all_generated_ids(
                     if unique_id:
                         generated_ids.add(unique_id)
             except Exception as e:
-                print(f"警告: 读取JSON文件失败 {json_file}: {e}")
+                print(f"Warning: failed to read JSON file {json_file}: {e}")
                 continue
 
     return generated_ids
 
 
-# 控制是否使用 MD5 哈希作为 unique_id
+# Control whether to use MD5 hash as unique_id
 USE_MD5_HASH = False
 SAVE_ORIGINAL_STRING = False
 
@@ -117,7 +117,7 @@ def save_sample_data(
     sub_type: Optional[str] = None
 ) -> bool:
     """
-    保存样本数据到指定目录
+    Save sample data to the specified directory
     """
     try:
         if sub_type:
@@ -163,9 +163,9 @@ def save_sample_data(
                                 img = Image.fromarray(source)
                                 img.save(dest_path, quality=95)
                             else:
-                                raise ValueError(f"无法保存图像文件 {filename}，不支持的类型: {type(source)}")
+                                raise ValueError(f"Cannot save image file {filename}, unsupported type: {type(source)}")
                     except Exception as e:
-                        print(f"警告: 保存图像文件 {filename} 失败: {e}")
+                        print(f"Warning: failed to save image file {filename}: {e}")
 
         if isinstance(unique_id, tuple):
             md5_hash, original_string = unique_id
@@ -185,13 +185,13 @@ def save_sample_data(
 
         return True
     except Exception as e:
-        print(f"错误: 保存样本数据失败 idx={idx}, unique_id={unique_id}: {e}")
+        print(f"Error: failed to save sample data idx={idx}, unique_id={unique_id}: {e}")
         return False
 
 
 def get_combination_key(files: List[str]) -> str:
     """
-    生成图像组合的唯一键（用于去重）
+    Generate a unique key for an image combination (for deduplication)
     """
     sorted_files = sorted(files)
     key_str = "|".join(sorted_files)
@@ -200,7 +200,7 @@ def get_combination_key(files: List[str]) -> str:
 
 def generate_unique_id(task: str, return_original: bool = False, **kwargs) -> Union[str, Tuple[str, str]]:
     """
-    生成唯一识别编号
+    Generate a unique identification number
     """
     if task == "customization":
         combination_key = kwargs.get('combination_key', '')

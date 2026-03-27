@@ -34,7 +34,7 @@ dataset_snapshot_download(
 )
 controlnet_image = Image.open("data/example_image_dataset/canny/image_1.jpg").resize((1328, 1328))
 
-prompt = "一只小狗，毛发光洁柔顺，眼神灵动，背景是樱花纷飞的春日庭院，唯美温馨。"
+prompt = "A puppy with glossy, smooth fur and bright eyes, against a backdrop of a spring garden with cherry blossoms drifting in the air, beautiful and cozy."
 image = pipe(
     prompt, seed=0,
     blockwise_controlnet_inputs=[ControlNetInput(image=controlnet_image)]

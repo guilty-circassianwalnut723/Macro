@@ -1,12 +1,12 @@
 """
-最简格式转换工具
+Minimal format conversion utility
 
-将final格式的数据转换为最简格式，只保留:
-- task: 任务类型
-- idx: 样本索引
-- prompt: 提示词
-- input_images: 输入图像列表
-- output_image: 输出图像路径
+Converts data from final format to minimal format, keeping only:
+- task: task type
+- idx: sample index
+- prompt: prompt text
+- input_images: input image list
+- output_image: output image path
 """
 
 import json
@@ -16,17 +16,17 @@ from typing import Dict, Any, List
 
 def convert_to_minimal(sample: Dict[str, Any], task: str, idx: int) -> Dict[str, Any]:
     """
-    将样本转换为最简格式
+    Convert a sample to minimal format
     
     Args:
-        sample: 原始样本数据
-        task: 任务类型
-        idx: 样本索引
+        sample: original sample data
+        task: task type
+        idx: sample index
     
     Returns:
-        最简格式的样本数据
+        sample data in minimal format
     """
-    # 尝试从多个可能的字段名获取 prompt
+    # Try to get prompt from multiple possible field names
     prompt = (
         sample.get("instruction") or 
         sample.get("prompt") or 
@@ -47,15 +47,15 @@ def convert_to_minimal(sample: Dict[str, Any], task: str, idx: int) -> Dict[str,
 
 def convert_json_file(json_path: Path, task: str, idx: int) -> Dict[str, Any]:
     """
-    从JSON文件读取并转换为最简格式
+    Read from JSON file and convert to minimal format
     
     Args:
-        json_path: JSON文件路径
-        task: 任务类型
-        idx: 样本索引
+        json_path: JSON file path
+        task: task type
+        idx: sample index
     
     Returns:
-        最简格式的样本数据
+        sample data in minimal format
     """
     with open(json_path, 'r', encoding='utf-8') as f:
         sample = json.load(f)

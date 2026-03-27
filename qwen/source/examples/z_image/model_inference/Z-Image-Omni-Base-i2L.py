@@ -51,7 +51,7 @@ save_file(lora, "lora.safetensors")
 
 # Generate images
 prompt = "a cat"
-negative_prompt = "泛黄，发绿，模糊，低分辨率，低质量图像，扭曲的肢体，诡异的外观，丑陋，AI感，噪点，网格感，JPEG压缩条纹，异常的肢体，水印，乱码，意义不明的字符"
+negative_prompt = "yellowing, greenish tint, blurry, low resolution, low quality image, distorted limbs, eerie appearance, ugly, AI-generated feel, noise, grid pattern, JPEG compression artifacts, abnormal limbs, watermark, garbled text, meaningless characters"
 image = pipe(
     prompt=prompt,
     negative_prompt=negative_prompt,

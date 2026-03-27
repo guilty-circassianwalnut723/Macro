@@ -1,19 +1,19 @@
-// 全局状态
+// Global state
 const state = {
     currentTask: '',
     currentSubType: '',
     currentSplitType: '',
     currentImageCountCategory: '',
-    currentFilter: 'all',  // 新增：筛选类型
+    currentFilter: 'all',  // New: filter type
     currentPage: 1,
     totalPages: 1,
     totalSamples: 0,
     isLoading: false,
-    currentSamples: [],  // 当前页的样本
-    spatialHasSubTypes: false  // 后端检测到的 spatial 是否有 sub_type 层
+    currentSamples: [],  // Current page samples
+    spatialHasSubTypes: false  // Whether backend detected sub_type layer for spatial
 };
 
-// DOM 元素
+// DOM elements
 const elements = {
     taskSelect: document.getElementById('task-select'),
     subTypeSelect: document.getElementById('sub-type-select'),
@@ -36,12 +36,12 @@ const elements = {
     backToTopBtn: document.getElementById('back-to-top')
 };
 
-// 初始化
+// Initialization
 document.addEventListener('DOMContentLoaded', () => {
-    // 从URL参数初始化状态
+    // Initialize state from URL parameters
     initializeFromURL();
     loadTasks().then(() => {
-        // 在加载完任务列表后，恢复选择状态
+        // Restore selection state after task list is loaded
         restoreStateFromURL();
     });
     setupEventListeners();
@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     setupBackToTop();
 });
 
-// 设置图片点击事件委托（只需要绑定一次）
+// Set up image click event delegation (only needs to be bound once)
 function setupImageClickDelegate() {
     elements.samplesContainer.addEventListener('click', (e) => {
         if (e.target.tagName === 'IMG' && e.target.closest('.image-item')) {
@@ -62,7 +62,7 @@ function setupImageClickDelegate() {
     });
 }
 
-// 设置事件监听器
+// Set up event listeners
 function setupEventListeners() {
     elements.taskSelect.addEventListener('change', handleTaskChange);
     elements.subTypeSelect.addEventListener('change', handleSubTypeChange);
@@ -73,9 +73,9 @@ function setupEventListeners() {
     elements.nextPageBtn.addEventListener('click', () => changePage(1));
 }
 
-// 设置返回顶部功能
+// Set up back-to-top functionality
 function setupBackToTop() {
-    // 监听滚动事件，显示/隐藏返回顶部按钮
+    // Listen for scroll event, show/hide back-to-top button
     window.addEventListener('scroll', () => {
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
         if (scrollTop > 300) {
@@ -85,7 +85,7 @@ function setupBackToTop() {
         }
     });
     
-    // 点击返回顶部按钮
+    // Click back-to-top button
     elements.backToTopBtn.addEventListener('click', () => {
         window.scrollTo({
             top: 0,
@@ -94,7 +94,7 @@ function setupBackToTop() {
     });
 }
 
-// URL参数管理函数
+// URL parameter management functions
 function updateURL() {
     const params = new URLSearchParams();
     if (state.currentTask) params.set('task', state.currentTask);
@@ -108,7 +108,7 @@ function updateURL() {
     window.history.pushState({}, '', newURL);
 }
 
-// 从URL参数初始化状态
+// Initialize state from URL parameters
 function initializeFromURL() {
     const params = new URLSearchParams(window.location.search);
     state.currentTask = params.get('task') || '';
@@ -119,37 +119,37 @@ function initializeFromURL() {
     state.currentPage = parseInt(params.get('page') || '1', 10);
 }
 
-// 从URL恢复状态（在任务列表加载完成后调用）
+// Restore state from URL (called after task list is loaded)
 async function restoreStateFromURL() {
-    // 恢复任务选择
+    // Restore task selection
     if (state.currentTask) {
         elements.taskSelect.value = state.currentTask;
         
-        // 如果是 spatial，先查询后端是否有 sub_type 层
+        // If spatial, first query backend whether sub_type layer exists
         if (state.currentTask === 'spatial') {
             await loadSpatialSubTypes();
             
-            // 若后端有 sub_type 层，恢复子类型选择
+            // If backend has sub_type layer, restore subtype selection
             if (state.spatialHasSubTypes && state.currentSubType) {
                 elements.subTypeSelect.value = state.currentSubType;
             }
         }
         
-        // 恢复 split type 选择
+        // Restore split type selection
         if (state.currentSplitType) {
             elements.splitTypeSelect.value = state.currentSplitType;
             
-            // 加载 image count categories
+            // Load image count categories
             await loadImageCountCategories();
             
-            // 恢复 image count category 选择
+            // Restore image count category selection
             if (state.currentImageCountCategory) {
                 elements.imageCountSelect.value = state.currentImageCountCategory;
-                // 恢复 filter 选择
+                // Restore filter selection
                 if (state.currentFilter) {
                     elements.filterSelect.value = state.currentFilter;
                 }
-                // 加载样本数据
+                // Load sample data
                 await loadSamples(true);
             }
         }
@@ -158,7 +158,7 @@ async function restoreStateFromURL() {
     updateCurrentSelection();
 }
 
-// 设置图片模态框
+// Set up image modal
 function setupImageModal() {
     const modal = document.createElement('div');
     modal.className = 'image-modal';
@@ -171,17 +171,17 @@ function setupImageModal() {
         }
     });
     
-    // 保存模态框引用
+    // Save modal reference
     window.imageModal = modal;
 }
 
-// 加载任务列表
+// Load task list
 async function loadTasks() {
     try {
         const response = await fetch('/api/tasks');
         const tasks = await response.json();
         
-        elements.taskSelect.innerHTML = '<option value="">请选择...</option>';
+        elements.taskSelect.innerHTML = '<option value="">Please select...</option>';
         tasks.forEach(task => {
             const option = document.createElement('option');
             option.value = task;
@@ -189,15 +189,15 @@ async function loadTasks() {
             elements.taskSelect.appendChild(option);
         });
     } catch (error) {
-        showError('加载任务列表失败: ' + error.message);
+        showError('Failed to load task list: ' + error.message);
     }
 }
 
-// 处理任务变化
+// Handle task change
 async function handleTaskChange() {
     const task = elements.taskSelect.value;
     
-    // 重置所有下级状态
+    // Reset all downstream state
     state.currentTask = task;
     state.currentSubType = '';
     state.currentSplitType = '';
@@ -205,46 +205,46 @@ async function handleTaskChange() {
     state.currentPage = 1;
     state.spatialHasSubTypes = false;
     
-    // 重置下级 UI
+    // Reset downstream UI
     elements.splitTypeSelect.value = '';
-    elements.imageCountSelect.innerHTML = '<option value="">请选择...</option>';
+    elements.imageCountSelect.innerHTML = '<option value="">Please select...</option>';
     elements.subTypeGroup.style.display = 'none';
-    elements.subTypeSelect.innerHTML = '<option value="">请选择...</option>';
+    elements.subTypeSelect.innerHTML = '<option value="">Please select...</option>';
     
     updateCurrentSelection();
     clearSamples();
     
     if (!task) return;
     
-    // 如果是 spatial，先查询后端是否有 sub_type 层
+    // If spatial, first query backend whether sub_type layer exists
     if (task === 'spatial') {
         await loadSpatialSubTypes();
-        // loadSpatialSubTypes 会根据结果决定是否显示 sub_type 选择器
-        // 若无 sub_type，此时 split_type 已重置，无需再加载 categories
+        // loadSpatialSubTypes will decide whether to show sub_type selector based on result
+        // If no sub_type, split_type has been reset, no need to load categories
     }
-    // 非 spatial 无需额外操作，等用户选 split_type
+    // Non-spatial needs no extra action, wait for user to select split_type
 }
 
-// 加载 Spatial 子类型
+// Load Spatial subtypes
 async function loadSpatialSubTypes() {
     try {
         const response = await fetch('/api/spatial_sub_types');
         const subTypes = await response.json();
         
-        // 记录后端是否真的有 sub_type
+        // Record whether backend actually has sub_type
         state.spatialHasSubTypes = subTypes.length > 0;
         
         if (subTypes.length === 0) {
-            // filter 布局：无 sub_type 层，隐藏 sub_type 选择器
+            // filter layout: no sub_type layer, hide sub_type selector
             elements.subTypeGroup.style.display = 'none';
-            elements.subTypeSelect.innerHTML = '<option value="">请选择...</option>';
+            elements.subTypeSelect.innerHTML = '<option value="">Please select...</option>';
             state.currentSubType = '';
             return;
         }
         
-        // final 布局：显示 sub_type 选择器并填充选项
+        // final layout: show sub_type selector and fill options
         elements.subTypeGroup.style.display = 'flex';
-        elements.subTypeSelect.innerHTML = '<option value="">请选择...</option>';
+        elements.subTypeSelect.innerHTML = '<option value="">Please select...</option>';
         subTypes.forEach(subType => {
             const option = document.createElement('option');
             option.value = subType;
@@ -252,54 +252,54 @@ async function loadSpatialSubTypes() {
             elements.subTypeSelect.appendChild(option);
         });
     } catch (error) {
-        showError('加载子类型列表失败: ' + error.message);
+        showError('Failed to load subtype list: ' + error.message);
     }
 }
 
-// 处理子类型变化
+// Handle subtype change
 async function handleSubTypeChange() {
     state.currentSubType = elements.subTypeSelect.value;
-    // 清空下级
+    // Clear downstream
     state.currentImageCountCategory = '';
     state.currentPage = 1;
     
-    elements.imageCountSelect.innerHTML = '<option value="">请选择...</option>';
+    elements.imageCountSelect.innerHTML = '<option value="">Please select...</option>';
     
     updateCurrentSelection();
     clearSamples();
     
-    // 如果有 split type，重新加载 image count categories
+    // If split type is set, reload image count categories
     if (state.currentSplitType && state.currentSubType) {
         await loadImageCountCategories();
     }
 }
 
-// 处理分割类型变化
+// Handle split type change
 async function handleSplitTypeChange() {
     state.currentSplitType = elements.splitTypeSelect.value;
-    // 清空下级
+    // Clear downstream
     state.currentImageCountCategory = '';
     state.currentPage = 1;
     
-    elements.imageCountSelect.innerHTML = '<option value="">请选择...</option>';
+    elements.imageCountSelect.innerHTML = '<option value="">Please select...</option>';
     
     updateCurrentSelection();
     clearSamples();
     
     if (!state.currentTask || !state.currentSplitType) return;
     
-    // spatial：有 sub_type 层时需要先选 sub_type；无 sub_type 层直接加载
+    // spatial: if sub_type layer exists, sub_type must be selected first; otherwise load directly
     if (state.currentTask === 'spatial' && state.spatialHasSubTypes) {
         if (state.currentSubType) {
             await loadImageCountCategories();
         }
-        // 若还未选 sub_type，等用户选
+        // If sub_type not yet selected, wait for user
     } else {
         await loadImageCountCategories();
     }
 }
 
-// 加载图像数量类别
+// Load image count categories
 async function loadImageCountCategories() {
     if (!state.currentTask || !state.currentSplitType) {
         return;
@@ -307,7 +307,7 @@ async function loadImageCountCategories() {
     
     try {
         let url = `/api/image_count_categories?task=${state.currentTask}&split_type=${state.currentSplitType}`;
-        // 只有在后端确认有 sub_type 层，且用户已选 sub_type 时才传入
+        // Only pass sub_type when backend confirmed sub_type layer exists and user has selected it
         if (state.currentTask === 'spatial' && state.spatialHasSubTypes && state.currentSubType) {
             url += `&sub_type=${state.currentSubType}`;
         }
@@ -315,7 +315,7 @@ async function loadImageCountCategories() {
         const response = await fetch(url);
         const categories = await response.json();
         
-        elements.imageCountSelect.innerHTML = '<option value="">请选择...</option>';
+        elements.imageCountSelect.innerHTML = '<option value="">Please select...</option>';
         categories.forEach(category => {
             const option = document.createElement('option');
             option.value = category;
@@ -323,11 +323,11 @@ async function loadImageCountCategories() {
             elements.imageCountSelect.appendChild(option);
         });
     } catch (error) {
-        showError('加载图像数量类别失败: ' + error.message);
+        showError('Failed to load image count categories: ' + error.message);
     }
 }
 
-// 处理图像数量类别变化
+// Handle image count category change
 async function handleImageCountChange() {
     state.currentImageCountCategory = elements.imageCountSelect.value;
     state.currentPage = 1;
@@ -341,7 +341,7 @@ async function handleImageCountChange() {
     }
 }
 
-// 处理筛选类型变化
+// Handle filter type change
 async function handleFilterChange() {
     state.currentFilter = elements.filterSelect.value;
     state.currentPage = 1;
@@ -355,13 +355,13 @@ async function handleFilterChange() {
     }
 }
 
-// 加载样本数据
+// Load sample data
 async function loadSamples(reset = false) {
     if (!state.currentTask || !state.currentSplitType || !state.currentImageCountCategory) {
         return;
     }
     
-    // 对于 spatial 且后端有 sub_type 层时，必须选择子类型
+    // For spatial with backend sub_type layer, subtype must be selected
     if (state.currentTask === 'spatial' && state.spatialHasSubTypes && !state.currentSubType) {
         return;
     }
@@ -376,7 +376,7 @@ async function loadSamples(reset = false) {
     
     try {
         let url = `/api/samples?task=${state.currentTask}&split_type=${state.currentSplitType}&image_count_category=${state.currentImageCountCategory}&page=${state.currentPage}&filter=${state.currentFilter}`;
-        // 只有后端确认有 sub_type 层且已选时才传入
+        // Only pass sub_type when backend confirmed sub_type layer and it is selected
         if (state.currentTask === 'spatial' && state.spatialHasSubTypes && state.currentSubType) {
             url += `&sub_type=${state.currentSubType}`;
         }
@@ -398,33 +398,33 @@ async function loadSamples(reset = false) {
         state.currentSamples = data.samples;
         
         updatePagination();
-        renderSamples(state.currentSamples, true);  // 每次都是重置显示
+        renderSamples(state.currentSamples, true);  // Always reset display
         updateCurrentSelection();
         updateURL();
         
-        // 滚动到顶部
+        // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
-        showError('加载样本数据失败: ' + error.message);
+        showError('Failed to load sample data: ' + error.message);
     } finally {
         state.isLoading = false;
         showLoading(false);
-        updatePagination();  // 确保在finally中也更新分页状态
+        updatePagination();  // Ensure pagination is updated in finally block
     }
 }
 
 
-// 渲染样本
+// Render samples
 function renderSamples(samples, reset = false) {
     if (samples.length === 0) {
-        elements.samplesContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">暂无数据</div>';
+        elements.samplesContainer.innerHTML = '<div style="text-align: center; padding: 40px; color: #999;">No data available</div>';
         return;
     }
     
-    // 计算当前页的起始索引
+    // Calculate start index of current page
     const startIndex = (state.currentPage - 1) * 10 + 1;
     
-    // 渲染样本
+    // Render samples
     const samplesHtml = samples.map((sample, index) => {
         const sampleIndex = startIndex + index;
         return renderSample(sample, sampleIndex);
@@ -432,44 +432,44 @@ function renderSamples(samples, reset = false) {
     
     elements.samplesContainer.innerHTML = samplesHtml;
     
-    // 图片点击事件已经通过事件委托在初始化时绑定，无需再次绑定
+    // Image click event was bound via event delegation at initialization, no need to bind again
 }
 
-// 渲染单个样本
+// Render a single sample
 function renderSample(sample, index) {
     const uniqueId = sample.unique_id || sample.source_file || `sample-${index}`;
     const imageCount = sample.image_count || (sample.input_images ? sample.input_images.length : 0);
     
-    // 渲染输入图片
+    // Render input images
     const inputImagesHtml = sample.input_images && sample.input_images.length > 0
         ? sample.input_images.map((img, idx) => {
             const imageUrl = `/api/image?path=${encodeURIComponent(img)}`;
             return `
                 <div class="image-item">
-                    <img src="${imageUrl}" alt="Input ${idx + 1}" loading="lazy" onerror="this.parentElement.classList.add('error'); this.parentElement.innerHTML='<span>图片加载失败</span>';">
+                    <img src="${imageUrl}" alt="Input ${idx + 1}" loading="lazy" onerror="this.parentElement.classList.add('error'); this.parentElement.innerHTML='<span>Image load failed</span>';">
                     <div class="image-label">Input ${idx + 1}</div>
                 </div>
             `;
         }).join('')
-        : '<div style="color: #999; text-align: center; padding: 20px;">无输入图片</div>';
+        : '<div style="color: #999; text-align: center; padding: 20px;">No input images</div>';
     
-    // 渲染输出图片
+    // Render output image
     const outputImageHtml = sample.output_image
         ? `
             <div class="image-item output-image-item">
-                <img src="/api/image?path=${encodeURIComponent(sample.output_image)}" alt="Output" loading="lazy" onerror="this.parentElement.classList.add('error'); this.parentElement.innerHTML='<span>图片加载失败</span>';">
+                <img src="/api/image?path=${encodeURIComponent(sample.output_image)}" alt="Output" loading="lazy" onerror="this.parentElement.classList.add('error'); this.parentElement.innerHTML='<span>Image load failed</span>';">
                 <div class="image-label">Output</div>
             </div>
         `
-        : '<div style="color: #999; text-align: center; padding: 20px;">无输出图片</div>';
+        : '<div style="color: #999; text-align: center; padding: 20px;">No output image</div>';
     
-    // 渲染其他信息
+    // Render other info
     const metaInfo = [];
     if (sample.guidance_score !== undefined) metaInfo.push(`<span class="score-item">Guidance: ${sample.guidance_score}</span>`);
     if (sample.training_score !== undefined) metaInfo.push(`<span class="score-item">Training: ${sample.training_score}</span>`);
     if (sample.temporal_score !== undefined) metaInfo.push(`<span class="score-item">Temporal: ${sample.temporal_score}</span>`);
     
-    // 获取prompt文本（支持多种字段名）
+    // Get prompt text (supports multiple field names)
     const promptText = sample.text || sample.instruction || sample.prompt || '';
     
     const infoHtml = Object.entries(sample)
@@ -483,7 +483,7 @@ function renderSample(sample, index) {
             } else if (typeof value === 'object' && value !== null) {
                 value = JSON.stringify(value);
             }
-            // 对value进行HTML转义，防止<image 1>这样的文本被误认为是HTML标签
+            // HTML-escape the value to prevent text like <image 1> from being treated as HTML tags
             const escapedKey = escapeHtml(String(key));
             const escapedValue = escapeHtml(String(value));
             return `<div class="info-row"><span class="info-label">${escapedKey}:</span><span class="info-value">${escapedValue}</span></div>`;
@@ -512,7 +512,7 @@ function renderSample(sample, index) {
     `;
 }
 
-// HTML 转义
+// HTML escaping
 function escapeHtml(text) {
     if (text == null) {
         return '';
@@ -522,7 +522,7 @@ function escapeHtml(text) {
     return div.innerHTML.replace(/\n/g, '<br>');
 }
 
-// 更新当前选择显示
+// Update current selection display
 function updateCurrentSelection() {
     elements.currentTask.textContent = state.currentTask || '-';
     elements.currentSubType.textContent = (state.currentTask === 'spatial' && state.spatialHasSubTypes && state.currentSubType) ? state.currentSubType : '-';
@@ -530,23 +530,23 @@ function updateCurrentSelection() {
     elements.currentImageCount.textContent = state.currentImageCountCategory || '-';
     elements.totalSamples.textContent = state.totalSamples;
     
-    // 更新筛选类型显示
+    // Update filter type display
     const filterLabels = {
-        'all': '全部',
-        'pass': '通过',
-        'fail': '未通过'
+        'all': 'All',
+        'pass': 'Pass',
+        'fail': 'Fail'
     };
-    elements.currentFilter.textContent = filterLabels[state.currentFilter] || '全部';
+    elements.currentFilter.textContent = filterLabels[state.currentFilter] || 'All';
 }
 
-// 更新分页信息
+// Update pagination info
 function updatePagination() {
-    elements.pageInfo.textContent = `第 ${state.currentPage} / ${state.totalPages} 页 (共 ${state.totalSamples} 个样本)`;
+    elements.pageInfo.textContent = `Page ${state.currentPage} / ${state.totalPages} (total ${state.totalSamples} samples)`;
     elements.prevPageBtn.disabled = state.currentPage <= 1 || state.isLoading;
     elements.nextPageBtn.disabled = state.currentPage >= state.totalPages || state.isLoading;
 }
 
-// 切换页面
+// Switch page
 function changePage(delta) {
     const newPage = state.currentPage + delta;
     if (newPage >= 1 && newPage <= state.totalPages && !state.isLoading) {
@@ -556,7 +556,7 @@ function changePage(delta) {
     }
 }
 
-// 清空样本
+// Clear samples
 function clearSamples() {
     elements.samplesContainer.innerHTML = '';
     state.currentPage = 1;
@@ -569,18 +569,18 @@ function clearSamples() {
     updateURL();
 }
 
-// 显示/隐藏加载提示
+// Show/hide loading indicator
 function showLoading(show) {
     elements.loading.style.display = show ? 'block' : 'none';
 }
 
-// 显示错误
+// Show error
 function showError(message) {
     elements.errorMessage.textContent = message;
     elements.errorMessage.style.display = 'block';
 }
 
-// 隐藏错误
+// Hide error
 function hideError() {
     elements.errorMessage.style.display = 'none';
 }

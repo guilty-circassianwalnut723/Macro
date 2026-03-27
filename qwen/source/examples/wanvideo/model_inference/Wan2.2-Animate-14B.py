@@ -29,7 +29,7 @@ input_image = Image.open("data/examples/wan/animate/animate_input_image.png")
 animate_pose_video = VideoData("data/examples/wan/animate/animate_pose_video.mp4").raw_data()[:81-4]
 animate_face_video = VideoData("data/examples/wan/animate/animate_face_video.mp4").raw_data()[:81-4]
 video = pipe(
-    prompt="视频中的人在做动作",
+    prompt="The person in the video is performing an action",
     seed=0, tiled=True,
     input_image=input_image,
     animate_pose_video=animate_pose_video,
@@ -49,7 +49,7 @@ animate_face_video = VideoData("data/examples/wan/animate/replace_face_video.mp4
 animate_inpaint_video = VideoData("data/examples/wan/animate/replace_inpaint_video.mp4").raw_data()[:81-4]
 animate_mask_video = VideoData("data/examples/wan/animate/replace_mask_video.mp4").raw_data()[:81-4]
 video = pipe(
-    prompt="视频中的人在做动作",
+    prompt="The person in the video is performing an action",
     seed=0, tiled=True,
     input_image=input_image,
     animate_pose_video=animate_pose_video,

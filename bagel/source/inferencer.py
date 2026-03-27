@@ -219,7 +219,7 @@ class InterleaveInferencer:
         num_timesteps=50,
         cfg_renorm_min=0.0,
         cfg_renorm_type="global",
-        image_shapes=None,  # 如果为 None，使用最后一张输入图像的尺寸；否则使用指定的尺寸
+        image_shapes=None,  # If None, use the last input image size; otherwise use the specified size
     ) -> List[Union[str, Image.Image]]:
 
         output_list = []
@@ -236,10 +236,10 @@ class InterleaveInferencer:
                 gen_context = self.update_context_text(system_prompt, gen_context)
                 cfg_img_context = self.update_context_text(system_prompt, cfg_img_context)
 
-            # 计算图像数量（用于动态调整分辨率）
+            # Count the number of images (for dynamic resolution adjustment)
             num_images = sum(1 for item in input_lists if isinstance(item, Image.Image))
             
-            # 如果指定了 image_shapes，使用指定的尺寸；否则使用最后一张输入图像的尺寸
+            # If image_shapes is specified, use that size; otherwise use the last input image size
             specified_image_shapes = image_shapes
 
             for input_term in input_lists:
@@ -249,11 +249,11 @@ class InterleaveInferencer:
                     cfg_img_context = self.update_context_text(input_term, cfg_img_context)
 
                 elif isinstance(input_term, Image.Image):
-                    # 传递 img_num 给 resize_transform 以支持动态分辨率
+                    # Pass img_num to resize_transform to support dynamic resolution
                     input_term = self.vae_transform.resize_transform(pil_img2rgb(input_term), img_num=num_images)
                     gen_context = self.update_context_image(input_term, gen_context, vae=not understanding_output)
 
-                    # 如果没有指定 image_shapes，使用当前输入图像的尺寸
+                    # If image_shapes is not specified, use the current input image size
                     if specified_image_shapes is None:
                         image_shapes = input_term.size[::-1]
                     cfg_text_context = deepcopy(gen_context)
@@ -261,7 +261,7 @@ class InterleaveInferencer:
                 else:
                     raise ValueError(f"Unsupported input type: {type(input_term)}")
             
-            # 如果指定了 image_shapes，使用指定的尺寸
+            # If image_shapes is specified, use the specified size
             if specified_image_shapes is not None:
                 image_shapes = specified_image_shapes
 

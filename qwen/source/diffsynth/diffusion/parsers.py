@@ -11,9 +11,9 @@ def add_dataset_base_config(parser: argparse.ArgumentParser):
 
 def parse_max_input_pixels(value):
     """
-    解析 max_input_pixels 参数，支持两种格式：
-    - 单个整数: "589824"
-    - 逗号分隔的列表: "1048576,1048576,1048576,589824,589824,589824,589824,589824,589824,589824"
+    Parse the max_input_pixels parameter, supporting two formats:
+    - Single integer: "589824"
+    - Comma-separated list: "1048576,1048576,1048576,589824,589824,589824,589824,589824,589824,589824"
     """
     if value is None:
         return None
@@ -61,10 +61,10 @@ def add_output_config(parser: argparse.ArgumentParser):
     parser.add_argument("--output_path", type=str, default="./models", help="Output save path.")
     parser.add_argument("--remove_prefix_in_ckpt", type=str, default="pipe.dit.", help="Remove prefix in ckpt.")
     parser.add_argument("--save_steps", type=int, default=None, help="Number of checkpoint saving invervals. If None, checkpoints will be saved every epoch.")
-    # Sliding checkpoint 配置
+    # Sliding checkpoint configuration
     parser.add_argument("--sliding_window_step", type=int, default=1000, help="Save a sliding checkpoint every N steps.")
     parser.add_argument("--sliding_window_size", type=int, default=5, help="Keep at most N sliding checkpoints.")
-    # 自动恢复（默认开启）
+    # Auto-resume (enabled by default)
     parser.add_argument("--auto_resume", default=True, action="store_true", help="Auto resume from the latest checkpoint in output_path.")
     parser.add_argument("--no_auto_resume", dest="auto_resume", action="store_false", help="Disable auto resume.")
     return parser

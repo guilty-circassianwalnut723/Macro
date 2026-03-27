@@ -23,7 +23,7 @@ pipe = FluxImagePipeline.from_pretrained(
     nexus_gen_processor_config=ModelConfig("DiffSynth-Studio/Nexus-GenV2", origin_file_pattern="processor"),
 )
 
-prompt = "一只可爱的猫咪"
+prompt = "An adorable cat"
 image = pipe(
     prompt=prompt, negative_prompt="",
     seed=0, cfg_scale=3, num_inference_steps=50,

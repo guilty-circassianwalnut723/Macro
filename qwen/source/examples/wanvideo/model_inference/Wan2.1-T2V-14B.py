@@ -17,8 +17,8 @@ pipe = WanVideoPipeline.from_pretrained(
 
 # Text-to-video
 video = pipe(
-    prompt="一名宇航员身穿太空服，面朝镜头骑着一匹机械马在火星表面驰骋。红色的荒凉地表延伸至远方，点缀着巨大的陨石坑和奇特的岩石结构。机械马的步伐稳健，扬起微弱的尘埃，展现出未来科技与原始探索的完美结合。宇航员手持操控装置，目光坚定，仿佛正在开辟人类的新疆域。背景是深邃的宇宙和蔚蓝的地球，画面既科幻又充满希望，让人不禁畅想未来的星际生活。",
-    negative_prompt="色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+    prompt="An astronaut in a spacesuit, facing the camera, gallops on a mechanical horse across the Martian surface. The desolate red terrain stretches into the distance, dotted with massive craters and strange rock formations. The mechanical horse moves steadily, kicking up faint dust clouds, embodying the perfect fusion of future technology and primitive exploration. The astronaut holds a control device with a determined gaze, as if blazing a new frontier for humanity. Against a backdrop of deep space and the blue Earth, the scene is both sci-fi and full of hope, inspiring visions of future interstellar life.",
+    negative_prompt="vivid colors, overexposed, static, blurry details, subtitles, stylized, artwork, painting, illustration, still, overall gray, worst quality, low quality, JPEG compression artifacts, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fused fingers, frozen frame, cluttered background, three legs, many people in background, walking backwards",
     seed=0, tiled=True,
 )
 save_video(video, "video_Wan2.1-T2V-14B.mp4", fps=15, quality=5)

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Customization任务评分模块
+Customization task scoring module
 
-提供customization任务的评分函数（GPT和Gemini）
+Provides scoring functions (GPT and Gemini) for the customization task
 """
 
 import os
@@ -21,13 +21,13 @@ macro_dir = script_dir.parents[2]  # eval/score -> eval -> Macro
 if str(macro_dir) not in sys.path:
     sys.path.insert(0, str(macro_dir))
 
-# 尝试导入utils模块，如果不存在则使用本地实现
+# Try to import utils module; fall back to local implementation if not found
 from utils.openai_utils import ask_gpt4o
 from utils.json_utils import mllm_output_to_dict
 from api_generator.text_generator.gemini_api import GeminiAPIGenerator
 
 # ============================================================================
-# PROMPT 配置（放在脚本最上方，方便修改）
+# PROMPT configuration (placed at top of script for easy modification)
 # ============================================================================
 EVALUATION_PROMPT = """You are a meticulous Digital Art Critic and Quality Assurance Specialist. You are known for your extremely high standards and attention to microscopic details.
 
@@ -90,9 +90,9 @@ Provide a concise Chain of Thought.
 """
 
 # ============================================================================
-# 配置常量
+# Configuration constants
 # ============================================================================
-# LLM配置
+# LLM configuration
 GPT_CONFIG = {
     "url": os.environ.get("OPENAI_URL", "https://api.openai.com/v1/chat/completions"),
     "key": os.environ.get("OPENAI_KEY", "")
@@ -104,25 +104,25 @@ GEMINI_CONFIG = {
     "max_try": 100
 }
 
-# 重试配置
+# Retry configuration
 MAX_RETRIES = 10
 RETRY_DELAY = 2
-TIMEOUT = 60  # 60秒超时
+TIMEOUT = 60  # 60-second timeout
 
 
 # ============================================================================
-# Prompt构建函数
+# Prompt construction functions
 # ============================================================================
 def build_prompt(instruction: str, image_descriptions: str) -> str:
     """
-    构建评分prompt
+    Build a scoring prompt
     
     Args:
-        instruction: 指令文本
-        image_descriptions: 图像描述文本
+        instruction: instruction text
+        image_descriptions: image description text
         
     Returns:
-        完整的prompt
+        complete prompt
     """
     return EVALUATION_PROMPT.format(
         instruction=instruction,
@@ -132,41 +132,41 @@ def build_prompt(instruction: str, image_descriptions: str) -> str:
 
 def build_image_descriptions(reference_images: List[str], generated_image: str) -> str:
     """
-    构建图像描述 - 优化版
+    Build image descriptions - optimized version
     
     Args:
-        reference_images: 参考图像路径列表
-        generated_image: 生成图像路径
+        reference_images: list of reference image paths
+        generated_image: generated image path
         
     Returns:
-        图像描述文本
+        image description text
     """
     descriptions = []
     
-    # 明确标记参考图
+    # Clearly label reference images
     for idx, ref_img in enumerate(reference_images, 1):
         descriptions.append(f"- <IMAGE_TOKEN> [Reference Image {idx}]: Input subject to preserve.")
     
-    # 明确标记生成图
+    # Clearly label the generated image
     descriptions.append(f"- <IMAGE_TOKEN> [Generated Image]: The final output to evaluate.")
     
     return "\n".join(descriptions)
 
 
 # ============================================================================
-# 评分函数
+# Scoring functions
 # ============================================================================
 def evaluate_with_gpt(sample_data: Dict[str, Any], sample_id: str = "") -> Optional[Dict[str, Any]]:
     """
-    使用GPT进行评分（支持多次重试，timeout=60s）
+    Score using GPT (supports multiple retries, timeout=60s)
     
     Args:
-        sample_data: 样本数据，包含 instruction, input_images, output_image 等字段
-        sample_id: 样本ID（用于日志）
+        sample_data: sample data containing instruction, input_images, output_image, etc.
+        sample_id: sample ID (for logging)
         
     Returns:
-        评分结果字典，包含 consistency_scores, following_score, overall_reasoning
-        如果失败返回None
+        score result dict containing consistency_scores, following_score, overall_reasoning
+        returns None on failure
     """
     instruction = sample_data.get('instruction', '')
     reference_images = sample_data.get('input_images', [])
@@ -176,24 +176,24 @@ def evaluate_with_gpt(sample_data: Dict[str, Any], sample_id: str = "") -> Optio
         print(f"[GPT] {sample_id}: Missing required data for GPT evaluation")
         return None
     
-    # 准备图像列表
+    # Prepare image list
     all_images = reference_images + [generated_image]
     
-    # 构建图像描述
+    # Build image descriptions
     image_descriptions = build_image_descriptions(reference_images, generated_image)
     
-    # 构建prompt
+    # Build prompt
     prompt = build_prompt(instruction, image_descriptions)
     
-    # 多次尝试调用GPT API
+    # Attempt to call GPT API multiple times
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             if attempt > 1:
-                print(f"[GPT] {sample_id}: 重试第 {attempt} 次（共 {MAX_RETRIES} 次）...")
+                print(f"[GPT] {sample_id}: Retry attempt {attempt} (of {MAX_RETRIES})...")
             
             response = ask_gpt4o(all_images, prompt, GPT_CONFIG["url"], GPT_CONFIG["key"])
             if not response:
-                print(f"[GPT] {sample_id}: 尝试 {attempt}/{MAX_RETRIES}: 空响应")
+                print(f"[GPT] {sample_id}: Attempt {attempt}/{MAX_RETRIES}: empty response")
                 if attempt < MAX_RETRIES:
                     time.sleep(RETRY_DELAY)
                     continue
@@ -201,25 +201,25 @@ def evaluate_with_gpt(sample_data: Dict[str, Any], sample_id: str = "") -> Optio
             
             result = mllm_output_to_dict(response)
             if result and isinstance(result, dict):
-                # 验证结果格式
+                # Validate result format
                 if 'consistency_scores' in result and 'following_score' in result:
                     if attempt > 1:
-                        print(f"[GPT] {sample_id}: 第 {attempt} 次尝试成功")
+                        print(f"[GPT] {sample_id}: Attempt {attempt} succeeded")
                     return result
                 else:
-                    print(f"[GPT] {sample_id}: 尝试 {attempt}/{MAX_RETRIES}: 结果格式不正确 - {list(result.keys())}")
+                    print(f"[GPT] {sample_id}: Attempt {attempt}/{MAX_RETRIES}: result format incorrect - {list(result.keys())}")
                     if attempt < MAX_RETRIES:
                         time.sleep(RETRY_DELAY)
                         continue
                     return None
             else:
-                print(f"[GPT] {sample_id}: 尝试 {attempt}/{MAX_RETRIES}: 解析失败 - {response[:200]}")
+                print(f"[GPT] {sample_id}: Attempt {attempt}/{MAX_RETRIES}: parse failed - {response[:200]}")
                 if attempt < MAX_RETRIES:
                     time.sleep(RETRY_DELAY)
                     continue
                 return None
         except Exception as e:
-            print(f"[GPT] {sample_id}: 尝试 {attempt}/{MAX_RETRIES}: 错误 - {e}")
+            print(f"[GPT] {sample_id}: Attempt {attempt}/{MAX_RETRIES}: error - {e}")
             if attempt < MAX_RETRIES:
                 traceback.print_exc()
                 time.sleep(RETRY_DELAY)
@@ -233,16 +233,16 @@ def evaluate_with_gpt(sample_data: Dict[str, Any], sample_id: str = "") -> Optio
 
 def evaluate_with_gemini(sample_data: Dict[str, Any], generator: 'GeminiAPIGenerator', sample_id: str = "") -> Optional[Dict[str, Any]]:
     """
-    使用Gemini进行评分（GeminiAPIGenerator内部已处理重试，timeout=60s）
+    Score using Gemini (retry logic is handled internally by GeminiAPIGenerator, timeout=60s)
     
     Args:
-        sample_data: 样本数据，包含 instruction, input_images, output_image 等字段
-        generator: Gemini生成器实例
-        sample_id: 样本ID（用于日志）
+        sample_data: sample data containing instruction, input_images, output_image, etc.
+        generator: Gemini generator instance
+        sample_id: sample ID (for logging)
         
     Returns:
-        评分结果字典，包含 consistency_scores, following_score, overall_reasoning
-        如果失败返回None
+        score result dict containing consistency_scores, following_score, overall_reasoning
+        returns None on failure
     """
     instruction = sample_data.get('instruction', '')
     reference_images = sample_data.get('input_images', [])
@@ -250,16 +250,16 @@ def evaluate_with_gemini(sample_data: Dict[str, Any], generator: 'GeminiAPIGener
     
     missing = []
     if not instruction:
-        missing.append("instruction（或 prompt）")
+        missing.append("instruction (or prompt)")
     if not reference_images:
-        missing.append("input_images（非空列表）")
+        missing.append("input_images (non-empty list)")
     if not generated_image:
-        missing.append("output_image（生成图路径）")
+        missing.append("output_image (generated image path)")
     if missing:
-        print(f"[Gemini] {sample_id}: Missing required data for Gemini evaluation: 缺少 {', '.join(missing)}")
+        print(f"[Gemini] {sample_id}: Missing required data for Gemini evaluation: missing {\", \".join(missing)}")
         return None
     
-    # 准备图像列表（PIL Image对象）
+    # Prepare image list (PIL Image objects)
     all_images = []
     for img_path in reference_images + [generated_image]:
         try:
@@ -269,20 +269,20 @@ def evaluate_with_gemini(sample_data: Dict[str, Any], generator: 'GeminiAPIGener
             print(f"[Gemini] {sample_id}: Error loading image {img_path}: {e}")
             return None
     
-    # 构建图像描述
+    # Build image descriptions
     image_descriptions = build_image_descriptions(reference_images, generated_image)
     
-    # 构建prompt
+    # Build prompt
     prompt = build_prompt(instruction, image_descriptions)
     
-    # 定义响应格式
+    # Define response format
     response_format = {
         "consistency_scores": "list[float]",
         "following_score": "float",
         "overall_reasoning": "str"
     }
     
-    # 调用Gemini API（重试逻辑由GeminiAPIGenerator内部处理）
+    # Call Gemini API (retry logic handled internally by GeminiAPIGenerator)
     try:
         response = generator.gen_response(
             prompt=prompt,
@@ -292,39 +292,39 @@ def evaluate_with_gemini(sample_data: Dict[str, Any], generator: 'GeminiAPIGener
         )
         
         if response is None:
-            print(f"[Gemini] {sample_id}: 空响应")
+            print(f"[Gemini] {sample_id}: empty response")
             return None
         
         if isinstance(response, dict):
-            # 验证结果格式
+            # Validate result format
             if 'consistency_scores' in response and 'following_score' in response:
                 return response
             else:
-                print(f"[Gemini] {sample_id}: 结果格式不正确 - {list(response.keys())}")
+                print(f"[Gemini] {sample_id}: result format incorrect - {list(response.keys())}")
                 return None
         else:
-            print(f"[Gemini] {sample_id}: 意外的响应类型 - {type(response)}")
+            print(f"[Gemini] {sample_id}: unexpected response type - {type(response)}")
             return None
     except Exception as e:
-        print(f"[Gemini] {sample_id}: 错误 - {e}")
+        print(f"[Gemini] {sample_id}: error - {e}")
         traceback.print_exc()
         return None
 
 
 def is_score_valid(score_data: Any) -> bool:
     """
-    判断评分是否有效（区分失败和低分）
+    Determine whether a score is valid (distinguishing failure from low score)
     
     Args:
-        score_data: 评分数据
+        score_data: score data
         
     Returns:
-        是否有效
+        whether valid
     """
     if score_data is None:
-        return False  # 失败
+        return False  # failed
     if isinstance(score_data, dict):
-        # 检查是否有必需的字段
+        # Check whether required fields are present
         if 'consistency_scores' in score_data and 'following_score' in score_data:
             return True
     return False

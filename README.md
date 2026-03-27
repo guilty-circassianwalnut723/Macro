@@ -5,15 +5,19 @@
 # MACRO: Advancing Multi-Reference Image Generation with Structured Long-Context Data
 
 <p align="center">
-  <strong>Zhekai Chen<sup>1,2</sup>, Yuqing Wang<sup>1</sup>, Manyuan Zhang<sup>2</sup>, Xihui Liu<sup>*1</sup></strong>
+  <strong>Zhekai Chen<sup>1</sup>, Yuqing Wang<sup>1</sup>, Manyuan Zhang<sup>2</sup>, Xihui Liu<sup>*1</sup></strong>
   <br>
   <sup>1</sup>HKU MMLab &nbsp;&nbsp; <sup>2</sup>Meituan
 </p>
 
 <p align="center">
+  <a href="https://macro400k.github.io/"><img src="https://img.shields.io/badge/🌐%20Project%20Page-blue"></a>
+  &nbsp;
   <a href="https://huggingface.co/datasets/Azily/Macro-Dataset"><img src="https://img.shields.io/badge/🤗%20Macro--Dataset-yellow"></a>
   &nbsp;
   <a href="https://arxiv.org/abs/XXXX.XXXXX"><img src="https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg"></a>
+  &nbsp;
+  <a href="https://huggingface.co/papers/XXXX.XXXXX"><img src="https://img.shields.io/badge/🤗%20Daily%20Paper-orange"></a>
 </p>
 
 **Macro** is a multi-reference image generation dataset and benchmark. It covers four task categories — **Customization**, **Illustration**, **Spatial**, and **Temporal** — across four image-count brackets (1–3, 4–5, 6–7, ≥8 reference images). Alongside the dataset we provide fine-tuned checkpoints for three open-source models: **Bagel**, **OmniGen2**, and **Qwen-Image-Edit**.
@@ -531,5 +535,31 @@ bash qwen/exps/my_experiment/run.sh
 
 The scripts use `torchrun` and support multi-node setups via the `AFO_ENV_CLUSTER_SPEC` environment variable. Single-node training works with defaults.
 
-Checkpoints are saved to `{model}/exps/{exp_name}/results/checkpoints/`.  
+Checkpoints are saved to `{model}/exps/{exp_name}/results/checkpoints/`.
 To evaluate a trained checkpoint, add it to `{model}/inference/config.yaml` and follow [Section 1.2](#12-batch-inference-on-the-benchmark).
+
+---
+
+## Acknowledgements
+
+We thank the authors and contributors of the following open-source projects that this work builds upon:
+
+- **[Bagel](https://github.com/ByteDance-Seed/Bagel)** — ByteDance Seed's unified multimodal generation framework, which serves as one of our base models.
+- **[OmniGen2](https://github.com/VectorSpaceLab/OmniGen2)** — VectorSpaceLab's versatile image generation model, which serves as one of our base models.
+- **[Qwen-Image-Edit / DiffSynth-Studio](https://github.com/modelscope/DiffSynth-Studio)** — ModelScope's DiffSynth-Studio framework and the Qwen-Image-Edit model, which serve as one of our base models and training frameworks.
+
+---
+
+## Citation
+
+If you find this work useful, please cite:
+
+```bibtex
+@article{chen2026macro,
+  title     = {MACRO: Advancing Multi-Reference Image Generation with Structured Long-Context Data},
+  author    = {Chen, Zhekai and Wang, Yuqing and Zhang, Manyuan and Liu, Xihui},
+  journal   = {arXiv preprint arXiv:XXXX.XXXXX},
+  year      = {2026},
+  url       = {https://arxiv.org/abs/XXXX.XXXXX}
+}
+```

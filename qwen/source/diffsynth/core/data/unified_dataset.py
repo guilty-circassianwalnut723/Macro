@@ -27,7 +27,7 @@ class UnifiedDataset(torch.utils.data.Dataset):
         self.cached_data = []
         self.load_from_cache = metadata_path is None
         self.load_metadata(metadata_path)
-    
+
     @staticmethod
     def default_image_operator(
         base_path="",
@@ -38,7 +38,7 @@ class UnifiedDataset(torch.utils.data.Dataset):
             (str, ToAbsolutePath(base_path) >> LoadImage() >> ImageCropAndResize(height, width, max_pixels, height_division_factor, width_division_factor)),
             (list, SequencialProcess(ToAbsolutePath(base_path) >> LoadImage() >> ImageCropAndResize(height, width, max_pixels, height_division_factor, width_division_factor))),
         ])
-    
+
     @staticmethod
     def default_video_operator(
         base_path="",
@@ -59,7 +59,7 @@ class UnifiedDataset(torch.utils.data.Dataset):
                 )),
             ])),
         ])
-        
+
     def search_for_cached_data_files(self, path):
         for file_name in os.listdir(path):
             subpath = os.path.join(path, file_name)
@@ -67,28 +67,28 @@ class UnifiedDataset(torch.utils.data.Dataset):
                 self.search_for_cached_data_files(subpath)
             elif subpath.endswith(".pth"):
                 self.cached_data.append(subpath)
-    
+
     def load_metadata(self, metadata_path):
         if metadata_path is None:
             print("No metadata_path. Searching for cached data files.")
             self.search_for_cached_data_files(self.base_path)
             print(f"{len(self.cached_data)} cached data files found.")
         elif os.path.isdir(metadata_path):
-            # 目录模式：加载目录下所有 .jsonl 文件
+            # Directory mode: load all .jsonl files in directory
             print(f"Loading metadata from directory: {metadata_path}")
             metadata = []
             jsonl_files = sorted(glob_module.glob(os.path.join(metadata_path, "*.jsonl")))
             if not jsonl_files:
-                # 如果没有 .jsonl 文件，尝试加载 .json 文件
+                # If no .jsonl files, try loading .json files
                 jsonl_files = sorted(glob_module.glob(os.path.join(metadata_path, "*.json")))
-            
+
             for jsonl_file in jsonl_files:
                 print(f"  Loading: {os.path.basename(jsonl_file)}")
                 if jsonl_file.endswith(".jsonl"):
                     with open(jsonl_file, 'r') as f:
                         for line in f:
                             line = line.strip()
-                            if line:  # 跳过空行
+                            if line:  # skip empty lines
                                 metadata.append(json.loads(line))
                 elif jsonl_file.endswith(".json"):
                     with open(jsonl_file, "r") as f:
@@ -97,7 +97,7 @@ class UnifiedDataset(torch.utils.data.Dataset):
                             metadata.extend(data)
                         else:
                             metadata.append(data)
-            
+
             print(f"Total {len(metadata)} items loaded from {len(jsonl_files)} files.")
             self.data = metadata
         elif metadata_path.endswith(".json"):
@@ -109,7 +109,7 @@ class UnifiedDataset(torch.utils.data.Dataset):
             with open(metadata_path, 'r') as f:
                 for line in f:
                     line = line.strip()
-                    if line:  # 跳过空行
+                    if line:  # skip empty lines
                         metadata.append(json.loads(line))
             self.data = metadata
         else:
@@ -117,16 +117,16 @@ class UnifiedDataset(torch.utils.data.Dataset):
             self.data = [metadata.iloc[i].to_dict() for i in range(len(metadata))]
 
     def __getitem__(self, data_id):
-        # 尝试加载数据，如果失败则跳过并尝试下一条
-        max_retries = 10  # 最多尝试10条数据
+        # Try to load data; if it fails, skip and try the next entry
+        max_retries = 10  # max 10 attempts
         original_data_id = data_id
-        
+
         for retry in range(max_retries):
             try:
                 if self.load_from_cache:
                     data = self.cached_data[data_id % len(self.cached_data)]
                     data = self.cached_data_operator(data)
-                    # 对于缓存数据，edit_image 可能已经被处理成图像对象，检查列表长度
+                    # For cached data, edit_image may already be processed into image objects; check list length
                     if self.max_edit_images is not None and "edit_image" in data:
                         edit_image = data.get("edit_image")
                         if edit_image is not None:
@@ -134,20 +134,20 @@ class UnifiedDataset(torch.utils.data.Dataset):
                                 edit_image_count = len(edit_image)
                             else:
                                 edit_image_count = 1
-                            
+
                             if edit_image_count > self.max_edit_images:
-                                # 跳过这条数据，尝试下一条
-                                print(f"[Dataset] 跳过数据 {data_id}: edit_image 数量 ({edit_image_count}) 超过限制 ({self.max_edit_images})")
+                                # Skip this entry, try the next one
+                                print(f"[Dataset] Skipping data {data_id}: edit_image count ({edit_image_count}) exceeds limit ({self.max_edit_images})")
                                 data_id = (data_id + 1) % len(self.cached_data)
                                 continue
-                    
-                    # 输出图像尺寸和文本长度信息（缓存数据）
+
+                    # Output image dimensions and text length info (cached data)
                     if not hasattr(self, '_debug_output_count'):
                         self._debug_output_count = 0
-                    if self._debug_output_count < 50:  # 只输出前50个样本
+                    if self._debug_output_count < 50:  # only output first 50 samples
                         info_parts = []
-                        
-                        # 输出图像尺寸
+
+                        # Output image dimensions
                         if "image" in data and data["image"] is not None:
                             img = data["image"]
                             if isinstance(img, (list, tuple)):
@@ -156,8 +156,8 @@ class UnifiedDataset(torch.utils.data.Dataset):
                                         info_parts.append(f"  img[{i}]: {im.size[0]}x{im.size[1]} ({im.size[0]*im.size[1]} pixels)")
                             elif hasattr(img, 'size'):
                                 info_parts.append(f"output_image: {img.size[0]}x{img.size[1]} ({img.size[0]*img.size[1]} pixels)")
-                        
-                        # 输出 edit_image 尺寸
+
+                        # Output edit_image dimensions
                         if "edit_image" in data and data["edit_image"] is not None:
                             edit_img = data["edit_image"]
                             if isinstance(edit_img, (list, tuple)):
@@ -172,8 +172,8 @@ class UnifiedDataset(torch.utils.data.Dataset):
                             elif hasattr(edit_img, 'size'):
                                 pixels = edit_img.size[0] * edit_img.size[1]
                                 info_parts.append(f"edit_image: {edit_img.size[0]}x{edit_img.size[1]} ({pixels} pixels)")
-                        
-                        # 输出文本长度
+
+                        # Output text length
                         if "prompt" in data and data["prompt"] is not None:
                             prompt = data["prompt"]
                             if isinstance(prompt, str):
@@ -182,48 +182,48 @@ class UnifiedDataset(torch.utils.data.Dataset):
                             elif isinstance(prompt, (list, tuple)):
                                 prompt_len = sum(len(p) if isinstance(p, str) else 0 for p in prompt)
                                 info_parts.append(f"prompt_length: {prompt_len} chars ({len(prompt)} items)")
-                        
+
                         if info_parts:
                             print(f"[Dataset] data_id={data_id} (cached): " + ", ".join(info_parts))
                         self._debug_output_count += 1
                 else:
                     data = self.data[data_id % len(self.data)].copy()
-                    
-                    # 检查 edit_image 数量限制（在数据操作之前检查，避免不必要的处理）
-                    # 此时 edit_image 还是原始数据（字符串或字符串列表）
+
+                    # Check edit_image count limit (before data operations to avoid unnecessary processing)
+                    # At this point edit_image is still raw data (string or list of strings)
                     if self.max_edit_images is not None and "edit_image" in data:
                         edit_image = data.get("edit_image")
                         if edit_image is not None:
-                            # 如果是列表，检查长度；如果是字符串，算作1张
+                            # If list, check length; if string, count as 1 image
                             if isinstance(edit_image, (list, tuple)):
                                 edit_image_count = len(edit_image)
                             else:
                                 edit_image_count = 1
-                            
+
                             if edit_image_count > self.max_edit_images:
-                                # 跳过这条数据，尝试下一条
-                                print(f"[Dataset] 跳过数据 {data_id}: edit_image 数量 ({edit_image_count}) 超过限制 ({self.max_edit_images})")
+                                # Skip this entry, try the next one
+                                print(f"[Dataset] Skipping data {data_id}: edit_image count ({edit_image_count}) exceeds limit ({self.max_edit_images})")
                                 data_id = (data_id + 1) % len(self.data)
                                 continue
 
-                    # 处理数据操作
+                    # Process data operations
                     for key in self.data_file_keys:
                         if key in data:
-                            # 跳过 None 值，不进行数据操作（用于 T2I 数据的 edit_image=null）
+                            # Skip None values, do not apply data operators (for T2I data with edit_image=null)
                             if data[key] is None:
                                 continue
                             if key in self.special_operator_map:
                                 data[key] = self.special_operator_map[key](data[key])
                             elif key in self.data_file_keys:
                                 data[key] = self.main_data_operator(data[key])
-                
-                # 输出图像尺寸和文本长度信息（限制输出频率）
+
+                # Output image dimensions and text length info (limit output frequency)
                 if not hasattr(self, '_debug_output_count'):
                     self._debug_output_count = 0
-                if self._debug_output_count < 50:  # 只输出前50个样本
+                if self._debug_output_count < 50:  # only output first 50 samples
                     info_parts = []
-                    
-                    # 输出图像尺寸
+
+                    # Output image dimensions
                     if "image" in data and data["image"] is not None:
                         img = data["image"]
                         if isinstance(img, (list, tuple)):
@@ -233,8 +233,8 @@ class UnifiedDataset(torch.utils.data.Dataset):
                                     info_parts.append(f"  img[{i}]: {im.size[0]}x{im.size[1]} ({im.size[0]*im.size[1]} pixels)")
                         elif hasattr(img, 'size'):
                             info_parts.append(f"output_image: {img.size[0]}x{img.size[1]} ({img.size[0]*img.size[1]} pixels)")
-                    
-                    # 输出 edit_image 尺寸
+
+                    # Output edit_image dimensions
                     if "edit_image" in data and data["edit_image"] is not None:
                         edit_img = data["edit_image"]
                         if isinstance(edit_img, (list, tuple)):
@@ -249,8 +249,8 @@ class UnifiedDataset(torch.utils.data.Dataset):
                         elif hasattr(edit_img, 'size'):
                             pixels = edit_img.size[0] * edit_img.size[1]
                             info_parts.append(f"edit_image: {edit_img.size[0]}x{edit_img.size[1]} ({pixels} pixels)")
-                    
-                    # 输出文本长度
+
+                    # Output text length
                     if "prompt" in data and data["prompt"] is not None:
                         prompt = data["prompt"]
                         if isinstance(prompt, str):
@@ -259,21 +259,21 @@ class UnifiedDataset(torch.utils.data.Dataset):
                         elif isinstance(prompt, (list, tuple)):
                             prompt_len = sum(len(p) if isinstance(p, str) else 0 for p in prompt)
                             info_parts.append(f"prompt_length: {prompt_len} chars ({len(prompt)} items)")
-                    
+
                     if info_parts:
                         print(f"[Dataset] data_id={data_id}: " + ", ".join(info_parts))
                     self._debug_output_count += 1
-                
+
                 return data
             except Exception as e:
-                # 记录错误并尝试下一条数据
+                # Log error and try the next entry
                 if retry == 0:
-                    # 只在第一次打印详细错误
-                    print(f"[Dataset] 加载数据 {data_id} 失败: {type(e).__name__}: {str(e)[:100]}, 跳过...")
+                    # Only print detailed error on first attempt
+                    print(f"[Dataset] Failed to load data {data_id}: {type(e).__name__}: {str(e)[:100]}, skipping...")
                 data_id = (data_id + 1) % len(self.data) if not self.load_from_cache else (data_id + 1) % len(self.cached_data)
-        
-        # 如果所有重试都失败，抛出异常
-        raise RuntimeError(f"连续 {max_retries} 条数据加载失败，从 data_id={original_data_id} 开始")
+
+        # If all retries failed, raise exception
+        raise RuntimeError(f"{max_retries} consecutive data load failures starting from data_id={original_data_id}")
 
     def __len__(self):
         if self.max_data_items is not None:
@@ -282,7 +282,7 @@ class UnifiedDataset(torch.utils.data.Dataset):
             return len(self.cached_data) * self.repeat
         else:
             return len(self.data) * self.repeat
-        
+
     def check_data_equal(self, data1, data2):
         # Debug only
         if len(data1) != len(data2):

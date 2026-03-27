@@ -4,15 +4,15 @@ import os
 import base64
 
 def img2base64(img, format="JPEG"):
-    # 本地图片地址
-    assert isinstance(img, str) or isinstance(img, Image.Image), "img2base64仅支持str或Image格式"
+    # Local image path
+    assert isinstance(img, str) or isinstance(img, Image.Image), "img2base64 only supports str or Image format"
     if isinstance(img, str):
         if not os.path.exists(img):
-            return Exception(f"文件{img}不存在")
-        # 防止打开失败
+            return Exception(f"File {img} does not exist")
+        # Prevent failure on open
         Image.MAX_IMAGE_PIXELS = None
         img = Image.open(img)
-    # TODO: 当前强行等比例缩放为长边不超过1024像素
+    # TODO: currently force-resize so that the longer side does not exceed 1024 pixels
     width, height = img.size
     if width > 1024 or height > 1024:
         if width > height:
@@ -24,7 +24,7 @@ def img2base64(img, format="JPEG"):
         img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
     img_byte_arr = io.BytesIO()
     if img.mode == "RGBA":
-        # 将图像转换为RGB
+        # Convert image to RGB
         img = img.convert("RGB")
     img.save(img_byte_arr, format=format)
     return base64.b64encode(img_byte_arr.getvalue()).decode()

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
-评估脚本
+Evaluation script
 
-从inference的输出目录加载数据，使用LLM（GPT4o和Gemini-3-flash）进行评分
-支持多任务并行评估和断点续传
-支持多个baseline模型的评估
+Load data from inference output directory and score using LLM (GPT4o and Gemini-3-flash)
+Supports multi-task parallel evaluation and checkpoint resuming
+Supports evaluation of multiple baseline models
 
-outputs目录结构：
+Outputs directory structure:
   outputs/{baseline}/{exp_name}/{task}/{image_num_category}/
-  例如：outputs/bagel/exp_001/customization/1-3/
+  Example: outputs/bagel/exp_001/customization/1-3/
 """
 
 import os
@@ -23,7 +23,7 @@ import threading
 import time
 
 # ============================================================================
-# 配置常量
+# Configuration constants
 # ============================================================================
 SCRIPT_DIR = Path(__file__).parent
 MACRO_DIR = SCRIPT_DIR.parent
@@ -33,14 +33,14 @@ OUTPUT_DIR = MACRO_DIR / "outputs"
 if str(MACRO_DIR) not in sys.path:
     sys.path.insert(0, str(MACRO_DIR))
 
-# 支持的task列表和image num categories（使用LLM评分的任务）
+# Supported task list and image num categories (tasks using LLM scoring)
 SUPPORTED_TASKS = ["customization", "illustration", "spatial", "temporal"]
 IMAGE_NUM_CATEGORIES = ["1-3", "4-5", "6-7", ">=8"]
 
-# 支持的baseline模型
+# Supported baseline models
 SUPPORTED_BASELINES = ["bagel", "omnigen", "qwen"]
 
-# LLM配置
+# LLM configuration
 GPT_CONFIG = {
     "url": os.environ.get("OPENAI_URL", "https://api.openai.com/v1/chat/completions"),
     "key": os.environ.get("OPENAI_KEY", "")
@@ -52,15 +52,15 @@ GEMINI_CONFIG = {
     "max_try": 100
 }
 
-# 重试配置
+# Retry configuration
 MAX_RETRIES = 10
 RETRY_DELAY = 2
-TIMEOUT = 60  # 60秒超时
-PARALLEL_WORKERS = 128  # 并行处理样本数
+TIMEOUT = 60  # 60-second timeout
+PARALLEL_WORKERS = 128  # Number of parallel worker samples
 
 
 # ============================================================================
-# 数据加载函数
+# Data loading functions
 # ============================================================================
 def load_samples_from_output(
     baseline: str,
@@ -70,24 +70,24 @@ def load_samples_from_output(
     output_root: Optional[Path] = None,
 ) -> Dict[str, Any]:
     """
-    从output目录加载样本数据
+    Load sample data from output directory
     
-    目录结构：{output_root}/{baseline}/{exp_name}/{task}/{image_num_category}/
-    当 output_root 为 None 时使用默认 OUTPUT_DIR。
+    Directory structure: {output_root}/{baseline}/{exp_name}/{task}/{image_num_category}/
+    When output_root is None, use the default OUTPUT_DIR.
     
     Args:
-        baseline: 模型类型（bagel, omnigen, qwen, api）
-        exp_name: 实验名称（或 api 名称如 gpt/seed/nano）
-        task: 任务类型
-        image_num_category: 图像数量类别
-        output_root: 输出根目录，None 时用默认 OUTPUT_DIR
+        baseline: model type (bagel, omnigen, qwen, api)
+        exp_name: experiment name (or api name such as gpt/seed/nano)
+        task: task type
+        image_num_category: image count category
+        output_root: output root directory; use default OUTPUT_DIR when None
         
     Returns:
-        样本字典，key为idx（字符串格式），value为样本数据（包含json_file_path字段）
+        sample dict, key is idx (string format), value is sample data (contains json_file_path field)
     """
     root = Path(output_root) if output_root is not None else OUTPUT_DIR
     if baseline == "any":
-        # 任意目录：output_root 为“结果根”的父目录，exp_name 为结果根目录名
+        # Any directory: output_root is the parent of the "result root", exp_name is the result root directory name
         input_dir = root / exp_name / task / image_num_category
     else:
         input_dir = root / baseline / exp_name / task / image_num_category
@@ -96,7 +96,7 @@ def load_samples_from_output(
         return {}
     
     samples = {}
-    # 只加载样本 JSON（{idx:08d}.json），跳过 metadata.json 等非样本文件，避免覆盖
+    # Only load sample JSONs ({idx:08d}.json), skip non-sample files like metadata.json to avoid overwriting
     for json_file in sorted(input_dir.glob("*.json")):
         if not json_file.stem.isdigit():
             continue
@@ -104,7 +104,7 @@ def load_samples_from_output(
             with open(json_file, 'r', encoding='utf-8') as f:
                 sample = json.load(f)
             
-            # 使用 idx 作为 key；部分模型（如 omnigen）只写 base_idx 不写 idx，需兼容
+            # Use idx as key; some models (e.g. omnigen) only write base_idx not idx, need compatibility
             idx = sample.get("idx")
             if idx is None:
                 idx = sample.get("base_idx")
@@ -112,13 +112,13 @@ def load_samples_from_output(
                 idx = int(json_file.stem)
             if idx is None:
                 idx = 0
-            # 优先用文件名作为 sample_id，避免多个 JSON 写相同 idx 或 metadata.json 等覆盖
+            # Prefer filename as sample_id to avoid overwriting when multiple JSONs share the same idx or metadata.json
             if json_file.stem.isdigit() and len(json_file.stem) <= 8:
                 sample_id = f"{int(json_file.stem):08d}"
             else:
                 sample_id = f"{idx:08d}"
             
-            # 标准化字段名（prompt -> instruction）
+            # Standardize field names (prompt -> instruction)
             if 'prompt' in sample and 'instruction' not in sample:
                 sample['instruction'] = sample['prompt']
             
@@ -130,10 +130,10 @@ def load_samples_from_output(
                 'output_image': sample.get('output_image', ''),
                 'target_image': sample.get('target_image', ''),
                 'category': sample.get('category', image_num_category),
-                'json_file_path': str(json_file),  # 保存JSON文件路径，用于保存评分文件
-                'json_dir': str(json_file.parent)  # 保存JSON文件所在目录
+                'json_file_path': str(json_file),  # Save JSON file path, used for saving score files
+                'json_dir': str(json_file.parent)  # Save directory of JSON file
             }
-            # 若 JSON 中为相对路径，将 output_image 解析为相对 json_dir 的绝对路径
+            # If JSON contains relative path, resolve output_image relative to json_dir
             if row['output_image'] and not os.path.isabs(row['output_image']):
                 row['output_image'] = str(row['output_image'])
             if row['input_images']:
@@ -145,17 +145,17 @@ def load_samples_from_output(
                 row['input_images'] = resolved
             samples[sample_id] = row
         except Exception as e:
-            print(f"警告: 加载JSON文件失败 {json_file}: {e}")
+            print(f"Warning: failed to load JSON file {json_file}: {e}")
             continue
     
     return samples
 
 
 # ============================================================================
-# 主函数
+# Main function
 # ============================================================================
 def load_score_file(score_file: Path) -> Dict[str, Any]:
-    """加载单个样本的评分文件，用于断点续传"""
+    """Load a single sample score file, for checkpoint resuming"""
     if not score_file.exists():
         return {}
     
@@ -163,17 +163,17 @@ def load_score_file(score_file: Path) -> Dict[str, Any]:
         with open(score_file, 'r', encoding='utf-8') as f:
             return json.load(f)
     except Exception as e:
-        print(f"警告: 加载评分文件失败 {score_file}: {e}")
+        print(f"Warning: failed to load score file {score_file}: {e}")
         return {}
 
 
 def save_score_file(score_file: Path, scores: Dict[str, Any]):
-    """保存单个样本的评分文件"""
+    """Save a single sample score file"""
     try:
         with open(score_file, 'w', encoding='utf-8') as f:
             json.dump(scores, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        print(f"警告: 保存评分文件失败 {score_file}: {e}")
+        print(f"Warning: failed to save score file {score_file}: {e}")
 
 
 def run_evaluation(
@@ -188,24 +188,24 @@ def run_evaluation(
     max_samples: Optional[int] = None,
 ):
     """
-    运行评估（支持GPT和Gemini评分，支持断点续传）
+    Run evaluation (supports GPT and Gemini scoring, supports checkpoint resuming)
     
     Args:
-        baseline: 模型类型（bagel, omnigen, qwen, api）
-        exp_name: 实验名称（模型检查点名称，或 api 时为 gpt/seed/nano）
-        task: 任务类型 (customization, illustration, spatial, temporal, all)
-        image_num_category: 图像数量类别 (1-3, 4-5, 6-7, >=8, all)
-        output_dir: 输出目录，默认为评分文件保存在样本所在目录
-        output_root: 生成结果根目录，None 时用默认 OUTPUT_DIR（用于 api 等非默认路径）
-        use_gpt: 是否使用GPT评分
-        use_gemini: 是否使用Gemini评分
-        max_samples: 每个 (task, category) 最多评测的样本数，None 表示全部
+        baseline: model type (bagel, omnigen, qwen, api)
+        exp_name: experiment name (model checkpoint name, or gpt/seed/nano for api)
+        task: task type (customization, illustration, spatial, temporal, all)
+        image_num_category: image count category (1-3, 4-5, 6-7, >=8, all)
+        output_dir: output directory; default is to save score files in the same directory as samples
+        output_root: generation result root directory; use default OUTPUT_DIR when None (for api or non-default paths)
+        use_gpt: whether to use GPT scoring
+        use_gemini: whether to use Gemini scoring
+        max_samples: max samples to evaluate per (task, category); None means all
     """
-    # 验证baseline
+    # Validate baseline
     if baseline not in SUPPORTED_BASELINES:
         raise ValueError(f"Unsupported baseline: {baseline}. Supported baselines: {SUPPORTED_BASELINES}")
     
-    # 确定要处理的tasks
+    # Determine tasks to process
     if task == "all":
         tasks_to_process = SUPPORTED_TASKS
     else:
@@ -213,7 +213,7 @@ def run_evaluation(
             raise ValueError(f"Unsupported task: {task}. Supported tasks: {SUPPORTED_TASKS}")
         tasks_to_process = [task]
     
-    # 确定要处理的categories
+    # Determine categories to process
     if image_num_category == "all":
         categories_to_process = IMAGE_NUM_CATEGORIES
     else:
@@ -221,47 +221,47 @@ def run_evaluation(
             raise ValueError(f"Unsupported image_num_category: {image_num_category}. Supported: {IMAGE_NUM_CATEGORIES}")
         categories_to_process = [image_num_category]
     
-    # 处理每个task和category组合
+    # Process each task and category combination
     for current_task in tasks_to_process:
         for current_category in categories_to_process:
             print("=" * 80)
-            print(f"处理任务: {current_task}, 图像数量类别: {current_category}")
-            print(f"Baseline: {baseline}, 实验: {exp_name}")
+            print(f"Processing task: {current_task}, image count category: {current_category}")
+            print(f"Baseline: {baseline}, experiment: {exp_name}")
             print("=" * 80)
             
-            # 1. 加载样本数据
+            # 1. Load sample data
             samples = load_samples_from_output(
                 baseline, exp_name, current_task, current_category,
                 output_root=Path(output_root) if output_root else None,
             )
             if not samples:
-                print(f"警告: 没有找到样本数据，跳过 {current_task}/{current_category}")
+                print(f"Warning: no sample data found, skipping {current_task}/{current_category}")
                 continue
             
-            # 可选：只评测前 max_samples 个样本（按 sample_id 排序）
+            # Optional: only evaluate the first max_samples (sorted by sample_id)
             if max_samples is not None and max_samples > 0:
                 sorted_ids = sorted(samples.keys())[:max_samples]
                 samples = {sid: samples[sid] for sid in sorted_ids}
-                print(f"限制评测数量: {max_samples}，当前 {len(samples)} 个样本")
+                print(f"Limiting evaluation count: {max_samples}, current {len(samples)} samples")
             else:
-                print(f"找到 {len(samples)} 个样本")
+                print(f"Found {len(samples)} samples")
             
-            # 确定JSON文件所在目录（从第一个样本获取，所有样本应该在同一目录）
+            # Determine JSON file directory (from first sample; all samples should be in the same directory)
             first_sample = next(iter(samples.values()))
             json_dir = Path(first_sample.get('json_dir', ''))
             if not json_dir.exists():
-                print(f"警告: JSON文件目录不存在: {json_dir}，跳过 {current_task}/{current_category}")
+                print(f"Warning: JSON file directory not found: {json_dir}, skipping {current_task}/{current_category}")
                 continue
             
-            print(f"JSON文件目录: {json_dir}")
+            print(f"JSON file directory: {json_dir}")
             
-            # 动态导入对应的评分模块（使用文件路径导入）
+            # Dynamically import the corresponding scoring module (using file path import)
             score_module_path = SCRIPT_DIR / "score" / f"{current_task}.py"
             if not score_module_path.exists():
-                print(f"错误: 评分模块不存在: {score_module_path}")
+                print(f"Error: scoring module not found: {score_module_path}")
                 continue
             
-            # 使用importlib加载模块
+            # Use importlib to load module
             import importlib.util
             spec = importlib.util.spec_from_file_location(f"score.{current_task}", score_module_path)
             score_module = importlib.util.module_from_spec(spec)
@@ -271,7 +271,7 @@ def run_evaluation(
             evaluate_with_gemini_func = getattr(score_module, 'evaluate_with_gemini')
             is_score_valid_func = getattr(score_module, 'is_score_valid')
             
-            # 3. 初始化Gemini生成器（如果需要）
+            # 3. Initialize Gemini generator (if needed)
             gemini_generator = None
             if use_gemini:
                 try:
@@ -284,19 +284,19 @@ def run_evaluation(
                         timeout=TIMEOUT
                     )
                 except ImportError as e:
-                    print(f"警告: 无法导入GeminiAPIGenerator: {e}，跳过Gemini评分")
+                    print(f"Warning: cannot import GeminiAPIGenerator: {e}, skipping Gemini scoring")
                     use_gemini = False
             
-            # 4. 加载已有评分文件（断点续传）
+            # 4. Load existing score files (checkpoint resuming)
             existing_scores = {}
             for sample_id in samples.keys():
                 score_file = json_dir / f"{sample_id}.score"
                 if score_file.exists():
                     existing_scores[sample_id] = load_score_file(score_file)
             
-            print(f"已加载 {len(existing_scores)} 个已有评分文件")
+            print(f"Loaded {len(existing_scores)} existing score files")
             
-            # 获取需要处理的样本列表（过滤已完成的）
+            # Get the list of samples to process (filter out completed ones)
             sample_items = list(samples.items())
             samples_to_process = []
             for sample_id, sample_data in sample_items:
@@ -307,12 +307,12 @@ def run_evaluation(
                     continue
                 samples_to_process.append((sample_id, sample_data))
             
-            print(f"需要处理 {len(samples_to_process)} 个样本")
+            print(f"Need to process {len(samples_to_process)} samples")
             
-            # 5. GPT评分（如果启用）
+            # 5. GPT scoring (if enabled)
             if use_gpt:
                 print("\n" + "-" * 80)
-                print("第一步：进行GPT4o评分（并行处理）")
+                print("Step 1: GPT4o scoring (parallel processing)")
                 print("-" * 80)
                 
                 gpt_completed = 0
@@ -322,7 +322,7 @@ def run_evaluation(
                 def process_gpt_sample(item):
                     nonlocal gpt_completed
                     sample_id, sample_data = item
-                    # 检查是否已有GPT评分
+                    # Check whether GPT score already exists
                     existing_score = existing_scores.get(sample_id, {})
                     if is_score_valid_func(existing_score.get('gpt_scores')):
                         with gpt_lock:
@@ -335,11 +335,11 @@ def run_evaluation(
                     
                     with gpt_lock:
                         gpt_completed += 1
-                        print(f"[GPT] [{gpt_completed}/{gpt_total}] {sample_id}: 完成")
+                        print(f"[GPT] [{gpt_completed}/{gpt_total}] {sample_id}: done")
                     
                     return sample_id, gpt_score
                 
-                # 并行处理GPT评分
+                # Parallel GPT scoring
                 save_lock = threading.Lock()
                 with ThreadPoolExecutor(max_workers=PARALLEL_WORKERS) as executor:
                     gpt_futures = {executor.submit(process_gpt_sample, item): item for item in samples_to_process}
@@ -347,34 +347,34 @@ def run_evaluation(
                     for future in as_completed(gpt_futures):
                         sample_id, gpt_score = future.result()
                         
-                        # 加载或创建评分文件（保存在JSON文件同一目录）
+                        # Load or create score file (saved in the same directory as JSON file)
                         score_file = json_dir / f"{sample_id}.score"
                         with save_lock:
                             current_scores = load_score_file(score_file)
                             if not current_scores:
                                 current_scores = {}
                             
-                            # 更新GPT评分（只有当评分有效时才保存，区分0分和None）
+                            # Update GPT score (only save when score is valid, distinguishing 0 from None)
                             if is_score_valid_func(gpt_score):
-                                # 评分有效（包括0分），保存评分
+                                # Score is valid (including 0), save the score
                                 current_scores['gpt_scores'] = gpt_score
-                                # 如果使用Gemini，保留已有的gemini_scores
+                                # If using Gemini, preserve existing gemini_scores
                                 if use_gemini and 'gemini_scores' not in current_scores:
                                     existing_score = existing_scores.get(sample_id, {})
                                     if is_score_valid_func(existing_score.get('gemini_scores')):
                                         current_scores['gemini_scores'] = existing_score.get('gemini_scores')
-                                # 立即保存到.score文件
+                                # Immediately save to .score file
                                 save_score_file(score_file, current_scores)
                             elif gpt_score is None and not is_score_valid_func(current_scores.get('gpt_scores')):
-                                # 评分失败且当前也没有有效评分，不保存None，保持原状
+                                # Scoring failed and no valid score currently exists; do not save None, keep as-is
                                 pass
                 
-                print(f"\nGPT评分结果已保存到对应的.score文件")
+                print(f"\nGPT score results saved to corresponding .score files")
             
-            # 6. Gemini评分（如果启用）
+            # 6. Gemini scoring (if enabled)
             if use_gemini and gemini_generator:
                 print("\n" + "-" * 80)
-                print("第二步：进行Gemini评分（并行处理）")
+                print("Step 2: Gemini scoring (parallel processing)")
                 print("-" * 80)
                 
                 gemini_completed = 0
@@ -384,7 +384,7 @@ def run_evaluation(
                 def process_gemini_sample(item):
                     nonlocal gemini_completed
                     sample_id, sample_data = item
-                    # 检查是否已有Gemini评分
+                    # Check whether Gemini score already exists
                     existing_score = existing_scores.get(sample_id, {})
                     if is_score_valid_func(existing_score.get('gemini_scores')):
                         with gemini_lock:
@@ -395,11 +395,11 @@ def run_evaluation(
                     
                     with gemini_lock:
                         gemini_completed += 1
-                        print(f"[Gemini] [{gemini_completed}/{gemini_total}] {sample_id}: 完成")
+                        print(f"[Gemini] [{gemini_completed}/{gemini_total}] {sample_id}: done")
                     
                     return sample_id, gemini_score
                 
-                # 并行处理Gemini评分
+                # Parallel Gemini scoring
                 save_lock = threading.Lock()
                 with ThreadPoolExecutor(max_workers=PARALLEL_WORKERS) as executor:
                     gemini_futures = {executor.submit(process_gemini_sample, item): item for item in samples_to_process}
@@ -407,31 +407,31 @@ def run_evaluation(
                     for future in as_completed(gemini_futures):
                         sample_id, gemini_score = future.result()
                         
-                        # 加载或创建评分文件（保存在JSON文件同一目录）
+                        # Load or create score file (saved in the same directory as JSON file)
                         score_file = json_dir / f"{sample_id}.score"
                         with save_lock:
                             current_scores = load_score_file(score_file)
                             if not current_scores:
                                 current_scores = {}
                             
-                            # 更新Gemini评分（只有当评分有效时才保存，区分0分和None）
+                            # Update Gemini score (only save when valid, distinguishing 0 from None)
                             if is_score_valid_func(gemini_score):
-                                # 评分有效（包括0分），保存评分
+                                # Score is valid (including 0), save the score
                                 current_scores['gemini_scores'] = gemini_score
-                                # 如果使用GPT，保留已有的gpt_scores
+                                # If using GPT, preserve existing gpt_scores
                                 if use_gpt and 'gpt_scores' not in current_scores:
                                     existing_score = existing_scores.get(sample_id, {})
                                     if is_score_valid_func(existing_score.get('gpt_scores')):
                                         current_scores['gpt_scores'] = existing_score.get('gpt_scores')
-                                # 立即保存到.score文件
+                                # Immediately save to .score file
                                 save_score_file(score_file, current_scores)
                             elif gemini_score is None and not is_score_valid_func(current_scores.get('gemini_scores')):
-                                # 评分失败且当前也没有有效评分，不保存None，保持原状
+                                # Scoring failed and no valid score currently exists; do not save None, keep as-is
                                 pass
                 
-                print(f"\nGemini评分结果已保存到对应的.score文件")
+                print(f"\nGemini score results saved to corresponding .score files")
             
-            # 7. 统计结果
+            # 7. Summarize results
             total_samples = len(samples)
             gpt_success = 0
             gemini_success = 0
@@ -443,45 +443,45 @@ def run_evaluation(
                         gpt_success += 1
                     if use_gemini and is_score_valid_func(scores.get('gemini_scores')):
                         gemini_success += 1
-            print(f"\n统计: 总样本数={total_samples}, GPT成功={gpt_success}, Gemini成功={gemini_success}")
+            print(f"\nSummary: total_samples={total_samples}, GPT success={gpt_success}, Gemini success={gemini_success}")
     
     print("\n" + "=" * 80)
-    print("处理完成！")
+    print("Processing complete!")
     print("=" * 80)
 
 
 def main():
-    parser = argparse.ArgumentParser(description="多Baseline模型评估脚本（支持GPT和Gemini评分，支持断点续传）")
+    parser = argparse.ArgumentParser(description="Multi-baseline model evaluation script (supports GPT and Gemini scoring, supports checkpoint resuming)")
     
     parser.add_argument("--baseline", type=str, required=True,
                        choices=SUPPORTED_BASELINES,
-                       help="模型类型（bagel, omnigen, qwen）")
+                       help="model type (bagel, omnigen, qwen)")
     parser.add_argument("--exp_name", type=str, required=True,
-                       help="实验名称（模型检查点名称），对应outputs/{baseline}/下的子目录名")
+                       help="experiment name (model checkpoint name), corresponding to subdirectory under outputs/{baseline}/")
     parser.add_argument("--task", type=str, default="all",
                        choices=SUPPORTED_TASKS + ["all"],
-                       help="任务类型")
+                       help="task type")
     parser.add_argument("--image_num_category", type=str, default="all",
                        choices=IMAGE_NUM_CATEGORIES + ["all"],
-                       help="图像数量类别")
+                       help="image count category")
     parser.add_argument("--output_dir", type=str, default=None,
-                       help="输出目录，默认为评分文件保存在样本所在目录")
+                       help="output directory; default saves score files in the same directory as samples")
     parser.add_argument("--output_root", type=str, default=None,
-                       help="生成结果根目录，默认为 Macro/outputs；api 评测时需与 run 脚本的 output_root 一致")
+                       help="generation result root directory, default is Macro/outputs; for api evaluation, must match the output_root of the run script")
     parser.add_argument("--use_gpt", action="store_true", default=True,
-                       help="是否使用GPT评分（默认True）")
+                       help="whether to use GPT scoring (default True)")
     parser.add_argument("--no_gpt", dest="use_gpt", action="store_false",
-                       help="不使用GPT评分")
+                       help="do not use GPT scoring")
     parser.add_argument("--use_gemini", action="store_true", default=True,
-                       help="是否使用Gemini评分（默认True）")
+                       help="whether to use Gemini scoring (default True)")
     parser.add_argument("--no_gemini", dest="use_gemini", action="store_false",
-                       help="不使用Gemini评分")
+                       help="do not use Gemini scoring")
     parser.add_argument("--max_samples", type=int, default=None,
-                       help="每个 (task, image_num_category) 最多评测的样本数，不设则评测全部（用于快速试跑）")
+                       help="max samples to evaluate per (task, image_num_category); if not set, evaluate all (for quick test runs)")
     
     args = parser.parse_args()
     
-    # 运行评估
+    # Run evaluation
     run_evaluation(
         baseline=args.baseline,
         exp_name=args.exp_name,

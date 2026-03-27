@@ -1,16 +1,16 @@
-# Qwen-Image-Edit 实验配置文件
-# 用于全量微调 Qwen-Image-Edit 模型
-# 基于 DiffSynth-Studio 框架
+# Qwen-Image-Edit experiment configuration file
+# Used for full fine-tuning of Qwen-Image-Edit model
+# Based on DiffSynth-Studio framework
 
-# 全局配置
+# Global configuration
 global:
-  # 多参考图数据根目录 (JSON格式)
+  # Multi-reference image data root directory (JSON format)
   multiref_data_root: data/filter
-  # T2I数据配置 (使用示例数据)
+  # T2I data configuration (using example data)
   t2i_data_path: data/raw/t2i_example/t2i_example.jsonl
-  # 模型配置
+  # Model configuration
   model_id: "Qwen-Image-Edit-2511"
-  # 默认训练参数
+  # Default training parameters
   default_max_pixels: 589824
   default_max_input_pixels: [1048576, 1048576, 589824, 589824, 589824, 262144, 262144, 262144, 262144, 262144]
   default_max_edit_images: 10
@@ -21,7 +21,7 @@ global:
   default_gradient_accumulation_steps: 1
   default_t2i_ratio: 0.2
 
-# 数据配置模板
+# Data configuration templates
 data_config_templates:
   debug_config: &debug_config
     "1-3":
@@ -29,7 +29,7 @@ data_config_templates:
     "4-5":
       data_num: 1000
 
-# 实验配置列表
+# Experiment configuration list
 experiments:
   example_with_t2i:
     use_t2i: true

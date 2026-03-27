@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-Customization数据拆分脚本：将每个类别的数据拆分为train和eval
+Customization data split script: split each category's data into train and eval
 
-功能：
-1. 读取processed/customization目录下每个类别的jsonl文件
-2. 根据配置的eval样本数量，将数据拆分为train和eval
-3. 对于scene类别，特殊处理：100个multi-frame场景 + 100个single-frame场景
-4. 支持从已有数据中扩展eval：如果需要的eval数量超过已有的，从final_old中未被使用的数据源添加到新的eval中
-5. 保存到data_hl02/split/customization目录，格式为json（使用list）
+Features:
+1. Read jsonl files for each category from processed/customization directory
+2. Split data into train and eval based on configured eval sample count
+3. Special handling for the scene category: 100 multi-frame scenes + 100 single-frame scenes
+4. Support extending eval from existing data: if needed eval count exceeds existing, add unused sources from final_old
+5. Save to data_hl02/split/customization directory, format is json (using list)
 
-注意：
-- 用户只需指定eval数量，train数量自动计算为（总数据量 - eval数量）
-- 具体数据量由gen决定，split只负责划分
+Notes:
+- Users only need to specify eval count; train count is automatically (total - eval count)
+- The actual data volume is determined by gen; split only handles the division
 """
 
 import json
@@ -24,35 +24,35 @@ DATA_DIR = MACRO_DIR / "data"
 from tqdm import tqdm
 from typing import Set, Dict, List
 
-# ====== 配置参数 ======
+# ====== Configuration parameters ======
 DATA_DIR = DATA_DIR / "processed" / "customization"
 OUTPUT_DIR = DATA_DIR / "split" / "customization"
 FINAL_DIR = DATA_DIR / "final" / "customization"
 FINAL_OLD_DIR = DATA_DIR / "final_old" / "customization"
 
-# 配置每类eval样本数量（None表示不拆分，全部用于train）
-# 注意：用户只需指定eval数量，train数量自动计算为（总数据量 - eval数量）
+# Configure eval sample count per category (None means no split, all for train)
+# Note: users only need to specify eval count; train count is automatically (total - eval count)
 EVAL_COUNTS = {
     'human': 500,
     'cloth': 300,
     'object': 500,
-    'scene': 200,  # 200个场景：100个多帧 + 100个单帧
-    'style': 300,  # 从200扩展到300
+    'scene': 200,  # 200 scenes: 100 multi-frame + 100 single-frame
+    'style': 300,  # Expanded from 200 to 300
 }
 
-# 随机种子
+# Random seed
 RANDOM_SEED = 42
 # ======================
 
 
 def load_jsonl(jsonl_path: Path) -> list:
-    """加载jsonl文件"""
+    """Load jsonl file"""
     samples = []
     if not jsonl_path.exists():
-        print(f"警告: 文件不存在: {jsonl_path}")
+        print(f"Warning: file not found: {jsonl_path}")
         return samples
     
-    print(f"正在加载 {jsonl_path}...")
+    print(f"Loading {jsonl_path}...")
     with open(jsonl_path, 'r', encoding='utf-8') as f:
         for line in f:
             line = line.strip()
@@ -62,20 +62,20 @@ def load_jsonl(jsonl_path: Path) -> list:
                 data = json.loads(line)
                 samples.append(data)
             except json.JSONDecodeError as e:
-                print(f"警告: 无法解析JSON行: {e}")
+                print(f"Warning: cannot parse JSON line: {e}")
                 continue
     
-    print(f"加载了 {len(samples)} 个样本")
+    print(f"Loaded {len(samples)} samples")
     return samples
 
 
 def split_samples(samples: list, eval_count: int, seed: int = 42) -> tuple:
-    """将样本拆分为train和eval"""
+    """Split samples into train and eval"""
     if eval_count is None or eval_count <= 0:
         return samples, []
     
     if len(samples) <= eval_count:
-        print(f"警告: 样本总数 {len(samples)} 小于等于eval数量 {eval_count}，所有样本用于eval")
+        print(f"Warning: total sample count {len(samples)} is <= eval count {eval_count}, all samples used for eval")
         return [], samples
     
     random.seed(seed)
@@ -90,23 +90,23 @@ def split_samples(samples: list, eval_count: int, seed: int = 42) -> tuple:
 
 def split_scene_samples(samples: list, eval_scene_count: int, seed: int = 42) -> tuple:
     """
-    特殊处理scene场景：将样本拆分为train和eval
-    根据文件名识别多帧场景和单帧场景：
-    - 多帧场景：文件名格式为 {scene_idx}_{frame_idx}.jpg，例如 00000001_1.jpg
-    - 单帧场景：文件名格式为 {scene_idx}.jpg，例如 00006379.jpg
+    Special handling for scene samples: split into train and eval
+    Identify multi-frame and single-frame scenes from filenames:
+    - Multi-frame scenes: filename format {scene_idx}_{frame_idx}.jpg, e.g. 00000001_1.jpg
+    - Single-frame scenes: filename format {scene_idx}.jpg, e.g. 00006379.jpg
     
-    - 100个多帧场景，每个场景的所有帧都加入到eval（约500个样本）
-    - 100个单帧场景，每个场景1帧（100个样本）
-    - 总共约600个eval样本
+    - 100 multi-frame scenes, all frames added to eval (~500 samples)
+    - 100 single-frame scenes, 1 frame each (100 samples)
+    - Total ~600 eval samples
     """
     if eval_scene_count is None or eval_scene_count <= 0:
         return samples, []
     
     random.seed(seed)
     
-    # 根据文件名识别多帧场景和单帧场景
-    multi_frame_groups = {}  # key: scene_idx, value: list of samples (该场景的所有帧)
-    single_frame_samples = []  # 单帧场景的样本列表
+    # Identify multi-frame and single-frame scenes from filenames
+    multi_frame_groups = {}  # key: scene_idx, value: list of samples (all frames of this scene)
+    single_frame_samples = []  # List of single-frame scene samples
     
     for sample in samples:
         filename = sample.get('filename', '')
@@ -118,7 +118,7 @@ def split_scene_samples(samples: list, eval_scene_count: int, seed: int = 42) ->
                 single_frame_samples.append(sample)
                 continue
         
-        # 检查是否为多帧场景：文件名格式为 {scene_idx}_{frame_idx}.jpg
+        # Check if it is a multi-frame scene: filename format {scene_idx}_{frame_idx}.jpg
         if '_' in filename and filename.endswith('.jpg'):
             parts = filename.rsplit('_', 1)
             if len(parts) == 2:
@@ -130,63 +130,63 @@ def split_scene_samples(samples: list, eval_scene_count: int, seed: int = 42) ->
                     multi_frame_groups[scene_idx].append(sample)
                     continue
         
-        # 单帧场景
+        # Single-frame scene
         single_frame_samples.append(sample)
     
-    print(f"识别到 {len(multi_frame_groups)} 个多帧场景")
-    print(f"识别到 {len(single_frame_samples)} 个单帧场景")
+    print(f"Identified {len(multi_frame_groups)} multi-frame scenes")
+    print(f"Identified {len(single_frame_samples)} single-frame scenes")
     
-    # 需要100个多帧场景 + 100个单帧场景
+    # Need 100 multi-frame scenes + 100 single-frame scenes
     multi_frame_count = 100
     single_frame_count = 100
     
-    # 打乱多帧场景组
+    # Shuffle multi-frame scene groups
     multi_frame_scene_indices = list(multi_frame_groups.keys())
     random.shuffle(multi_frame_scene_indices)
     
-    # 打乱单帧场景
+    # Shuffle single-frame scenes
     random.shuffle(single_frame_samples)
     
-    # 选择多帧场景（前multi_frame_count个）
+    # Select multi-frame scenes (first multi_frame_count)
     selected_multi_frame_indices = multi_frame_scene_indices[:multi_frame_count]
     
-    # 选择单帧场景（前single_frame_count个）
+    # Select single-frame scenes (first single_frame_count)
     selected_single_frame_samples = single_frame_samples[:single_frame_count]
     
-    # 收集eval样本
+    # Collect eval samples
     eval_samples = []
     
-    # 添加多帧场景的所有帧
+    # Add all frames of multi-frame scenes
     for scene_idx in selected_multi_frame_indices:
         frames = multi_frame_groups[scene_idx]
         eval_samples.extend(frames)
-        print(f"场景 {scene_idx}: {len(frames)} 帧")
+        print(f"Scene {scene_idx}: {len(frames)} frames")
     
-    # 添加单帧场景
+    # Add single-frame scenes
     eval_samples.extend(selected_single_frame_samples)
     
-    # 收集train样本
+    # Collect train samples
     train_samples = []
     
-    # 剩余的多帧场景
+    # Remaining multi-frame scenes
     remaining_multi_frame_indices = multi_frame_scene_indices[multi_frame_count:]
     for scene_idx in remaining_multi_frame_indices:
         train_samples.extend(multi_frame_groups[scene_idx])
     
-    # 剩余的单帧场景
+    # Remaining single-frame scenes
     remaining_single_frame_samples = single_frame_samples[single_frame_count:]
     train_samples.extend(remaining_single_frame_samples)
     
-    print(f"多帧场景数: {len(selected_multi_frame_indices)} (共 {sum(len(multi_frame_groups[idx]) for idx in selected_multi_frame_indices)} 个样本)")
-    print(f"单帧场景数: {len(selected_single_frame_samples)} (共 {len(selected_single_frame_samples)} 个样本)")
-    print(f"Eval总样本数: {len(eval_samples)}")
-    print(f"Train总样本数: {len(train_samples)}")
+    print(f"Multi-frame scene count: {len(selected_multi_frame_indices)} (total {sum(len(multi_frame_groups[idx]) for idx in selected_multi_frame_indices)} samples)")
+    print(f"Single-frame scene count: {len(selected_single_frame_samples)} (total {len(selected_single_frame_samples)} samples)")
+    print(f"Total Eval samples: {len(eval_samples)}")
+    print(f"Total Train samples: {len(train_samples)}")
     
     return train_samples, eval_samples
 
 
 def get_combination_key(files: List[str]) -> str:
-    """生成图像组合的唯一键（用于去重）"""
+    """Generate a unique key for an image combination (for deduplication)"""
     sorted_files = sorted(files)
     key_str = "|".join(sorted_files)
     return hashlib.md5(key_str.encode()).hexdigest()
@@ -194,21 +194,21 @@ def get_combination_key(files: List[str]) -> str:
 
 def load_existing_eval_data(final_old_dir: Path, class_name: str) -> Dict[str, dict]:
     """
-    从final_old目录加载已有的eval数据
+    Load existing eval data from the final_old directory
     
     Args:
-        final_old_dir: final_old目录路径
-        class_name: 类别名称
+        final_old_dir: final_old directory path
+        class_name: category name
     
     Returns:
-        {combination_key: sample_data} 字典
+        {combination_key: sample_data} dict
     """
     existing_eval = {}
     
     if not final_old_dir.exists():
         return existing_eval
     
-    # 遍历所有image_count_category目录
+    # Iterate over all image_count_category directories
     for category_dir in final_old_dir.glob("*"):
         if not category_dir.is_dir():
             continue
@@ -217,26 +217,26 @@ def load_existing_eval_data(final_old_dir: Path, class_name: str) -> Dict[str, d
         if not eval_json_dir.exists():
             continue
         
-        # 读取所有JSON文件
+        # Read all JSON files
         for json_file in eval_json_dir.glob("*.json"):
             try:
                 with open(json_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     
-                    # 检查是否属于当前类别
+                    # Check whether it belongs to the current category
                     sample_class = data.get('class', '')
                     if sample_class != class_name:
                         continue
                     
-                    # 提取combination_key
+                    # Extract combination_key
                     input_images = data.get('input_images', [])
                     if input_images:
-                        # 提取文件名作为组合键
+                        # Extract filenames as combination key
                         files = [Path(img).name for img in input_images]
                         combination_key = get_combination_key(files)
                         existing_eval[combination_key] = data
             except Exception as e:
-                print(f"警告: 读取JSON文件失败 {json_file}: {e}")
+                print(f"Warning: failed to read JSON file {json_file}: {e}")
                 continue
     
     return existing_eval
@@ -244,14 +244,14 @@ def load_existing_eval_data(final_old_dir: Path, class_name: str) -> Dict[str, d
 
 def load_processed_samples_by_combination(processed_dir: Path, class_name: str) -> Dict[str, dict]:
     """
-    从processed目录加载样本，按combination_key索引
+    Load samples from the processed directory, indexed by combination_key
     
     Args:
-        processed_dir: processed目录路径
-        class_name: 类别名称
+        processed_dir: processed directory path
+        class_name: category name
     
     Returns:
-        {combination_key: sample_data} 字典
+        {combination_key: sample_data} dict
     """
     samples_by_key = {}
     jsonl_path = processed_dir / f"{class_name}.jsonl"
@@ -266,7 +266,7 @@ def load_processed_samples_by_combination(processed_dir: Path, class_name: str) 
                 continue
             try:
                 data = json.loads(line)
-                # 提取文件列表
+                # Extract file list
                 files = []
                 if 'files' in data:
                     files = [f if isinstance(f, str) else f.get('filepath', '') for f in data['files']]
@@ -274,12 +274,12 @@ def load_processed_samples_by_combination(processed_dir: Path, class_name: str) 
                     files = [data['filepath']]
                 
                 if files:
-                    # 提取文件名
+                    # Extract filenames
                     file_names = [Path(f).name for f in files]
                     combination_key = get_combination_key(file_names)
                     samples_by_key[combination_key] = data
             except Exception as e:
-                print(f"警告: 解析JSON行失败: {e}")
+                print(f"Warning: failed to parse JSON line: {e}")
                 continue
     
     return samples_by_key
@@ -294,38 +294,38 @@ def extend_eval_from_existing(
     seed: int = 42
 ) -> List[dict]:
     """
-    从已有数据中扩展eval样本
+    Extend eval samples from existing data
     
-    如果需要的eval数量超过已有的，从final_old中未被使用的数据源添加到新的eval中
+    If the needed eval count exceeds existing, add unused sources from final_old
     
     Args:
-        eval_samples: 当前eval样本列表
-        target_eval_count: 目标eval数量
-        processed_dir: processed目录路径
-        final_old_dir: final_old目录路径
-        class_name: 类别名称
-        seed: 随机种子
+        eval_samples: current eval sample list
+        target_eval_count: target eval count
+        processed_dir: processed directory path
+        final_old_dir: final_old directory path
+        class_name: category name
+        seed: random seed
     
     Returns:
-        扩展后的eval样本列表
+        extended eval sample list
     """
     current_eval_count = len(eval_samples)
     
     if current_eval_count >= target_eval_count:
         return eval_samples
     
-    print(f"\n需要扩展eval: 当前 {current_eval_count} 个，目标 {target_eval_count} 个")
-    print(f"从已有数据中查找可用的数据源...")
+    print(f"\nNeed to extend eval: current {current_eval_count}, target {target_eval_count}")
+    print(f"Looking for available sources from existing data...")
     
-    # 加载已有的eval数据（从final_old）
+    # Load existing eval data (from final_old)
     existing_eval = load_existing_eval_data(final_old_dir, class_name)
-    print(f"从final_old加载了 {len(existing_eval)} 个已有eval样本")
+    print(f"Loaded {len(existing_eval)} existing eval samples from final_old")
     
-    # 加载processed中的所有样本，按combination_key索引
+    # Load all samples from processed, indexed by combination_key
     processed_samples = load_processed_samples_by_combination(processed_dir, class_name)
-    print(f"从processed加载了 {len(processed_samples)} 个样本")
+    print(f"Loaded {len(processed_samples)} samples from processed")
     
-    # 获取当前eval样本的combination_key集合
+    # Get the combination_key set of current eval samples
     current_eval_keys: Set[str] = set()
     for sample in eval_samples:
         files = []
@@ -339,34 +339,34 @@ def extend_eval_from_existing(
             combination_key = get_combination_key(file_names)
             current_eval_keys.add(combination_key)
     
-    # 从已有eval中找到未被使用的样本
+    # Find unused samples from existing eval
     available_eval_keys = []
     for combo_key, eval_data in existing_eval.items():
         if combo_key not in current_eval_keys:
-            # 检查是否在processed中存在对应的数据源
+            # Check whether a corresponding source exists in processed
             if combo_key in processed_samples:
                 available_eval_keys.append(combo_key)
     
-    print(f"找到 {len(available_eval_keys)} 个可用的已有eval样本")
+    print(f"Found {len(available_eval_keys)} available existing eval samples")
     
-    # 随机选择需要补充的样本
+    # Randomly select samples to supplement
     need_count = target_eval_count - current_eval_count
     if need_count > 0 and available_eval_keys:
         random.seed(seed)
         selected_keys = random.sample(available_eval_keys, min(need_count, len(available_eval_keys)))
         
-        # 从processed中获取对应的样本数据
+        # Get corresponding sample data from processed
         for combo_key in selected_keys:
             if combo_key in processed_samples:
                 eval_samples.append(processed_samples[combo_key])
         
-        print(f"已添加 {len(selected_keys)} 个样本到eval")
+        print(f"Added {len(selected_keys)} samples to eval")
     
     return eval_samples
 
 
 def save_json(samples: list, output_path: Path):
-    """保存样本到json文件（使用list格式）"""
+    """Save samples to json file (using list format)"""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(samples, f, ensure_ascii=False, indent=2)
@@ -374,20 +374,20 @@ def save_json(samples: list, output_path: Path):
 
 def load_used_style_from_final(final_dir: Path) -> Set[str]:
     """
-    从final/customization目录加载已使用的style数据（train数据）
+    Load already-used style data from final/customization directory (train data)
     
     Args:
-        final_dir: final目录路径
+        final_dir: final directory path
     
     Returns:
-        已使用的style文件路径集合（标准化路径）
+        set of already-used style file paths (normalized)
     """
     used_style_paths = set()
     
     if not final_dir.exists():
         return used_style_paths
     
-    # 遍历所有image_count_category目录
+    # Iterate over all image_count_category directories
     for category_dir in final_dir.glob("*"):
         if not category_dir.is_dir():
             continue
@@ -396,34 +396,34 @@ def load_used_style_from_final(final_dir: Path) -> Set[str]:
         if not train_json_dir.exists():
             continue
         
-        # 读取所有JSON文件
+        # Read all JSON files
         for json_file in train_json_dir.glob("*.json"):
             try:
                 with open(json_file, 'r', encoding='utf-8') as f:
                     data = json.load(f)
                     
-                    # 检查是否包含style类别
+                    # Check whether it contains style category
                     categories = data.get('category', [])
                     if 'style' not in categories:
                         continue
                     
-                    # 提取style图像路径
+                    # Extract style image paths
                     input_images = data.get('input_images', [])
                     for img_path in input_images:
                         img_path_str = str(img_path)
-                        # 检查路径中是否包含style目录
+                        # Check whether the path contains style directory
                         if '/style/' in img_path_str or '/customization/style' in img_path_str:
-                            # 标准化路径：提取相对于processed/customization/style的路径
+                            # Normalize path: extract path relative to processed/customization/style
                             if '/style/' in img_path_str:
-                                # 提取文件名或相对路径
+                                # Extract filenames or relative paths
                                 style_path = img_path_str.split('/style/')[-1]
-                                # 构建完整路径
+                                # Build full path
                                 full_path = str(DATA_DIR / "style" / style_path)
                                 used_style_paths.add(full_path)
                             else:
                                 used_style_paths.add(img_path_str)
             except Exception as e:
-                print(f"警告: 读取JSON文件失败 {json_file}: {e}")
+                print(f"Warning: failed to read JSON file {json_file}: {e}")
                 continue
     
     return used_style_paths
@@ -437,37 +437,37 @@ def extend_style_eval_from_unused(
     seed: int = 42
 ) -> List[dict]:
     """
-    从未使用的style数据中扩展eval样本
+    Extend eval samples from unused style data
     
     Args:
-        eval_samples: 当前eval样本列表
-        target_eval_count: 目标eval数量
-        processed_dir: processed目录路径
-        final_dir: final目录路径
-        seed: 随机种子
+        eval_samples: current eval sample list
+        target_eval_count: target eval count
+        processed_dir: processed directory path
+        final_dir: final directory path
+        seed: random seed
     
     Returns:
-        扩展后的eval样本列表
+        extended eval sample list
     """
     current_eval_count = len(eval_samples)
     
     if current_eval_count >= target_eval_count:
         return eval_samples
     
-    print(f"\n需要扩展style eval: 当前 {current_eval_count} 个，目标 {target_eval_count} 个")
+    print(f"\nNeed to extend style eval: current {current_eval_count}, target {target_eval_count}")
     
-    # 加载已使用的style数据（从final/customization的train数据）
+    # Load already-used style data (from final/customization train data)
     used_style_paths = load_used_style_from_final(final_dir)
-    print(f"从final/customization加载了 {len(used_style_paths)} 个已使用的style数据")
+    print(f"Loaded {len(used_style_paths)} already-used style data from final/customization")
     
-    # 加载所有style样本
+    # Load all style samples
     style_jsonl_path = processed_dir / "style.jsonl"
     all_style_samples = load_jsonl(style_jsonl_path)
-    print(f"从processed加载了 {len(all_style_samples)} 个style样本")
+    print(f"Loaded {len(all_style_samples)} style samples from processed")
     
-    # 标准化路径：转换为绝对路径并规范化
+    # Normalize paths: convert to absolute paths and normalize
     def normalize_path(path_str: str) -> str:
-        """标准化路径"""
+        """Normalize path"""
         if not path_str:
             return ""
         path = Path(path_str)
@@ -476,7 +476,7 @@ def extend_style_eval_from_unused(
         else:
             return str((processed_dir / path_str).resolve())
     
-    # 获取当前eval样本的filepath集合（标准化）
+    # Get normalized filepath set of current eval samples
     current_eval_paths = set()
     for sample in eval_samples:
         filepath = sample.get('filepath', '')
@@ -484,10 +484,10 @@ def extend_style_eval_from_unused(
             normalized = normalize_path(filepath)
             current_eval_paths.add(normalized)
     
-    # 标准化已使用的路径
+    # Normalize already-used paths
     normalized_used_paths = {normalize_path(p) for p in used_style_paths}
     
-    # 找出未使用的style样本（既不在eval中，也不在final/train中）
+    # Find unused style samples (neither in eval nor in final/train)
     unused_samples = []
     for sample in all_style_samples:
         filepath = sample.get('filepath', '')
@@ -496,55 +496,55 @@ def extend_style_eval_from_unused(
             if normalized not in current_eval_paths and normalized not in normalized_used_paths:
                 unused_samples.append(sample)
     
-    print(f"找到 {len(unused_samples)} 个未使用的style样本")
+    print(f"Found {len(unused_samples)} unused style samples")
     
-    # 随机选择需要补充的样本
+    # Randomly select samples to supplement
     need_count = target_eval_count - current_eval_count
     if need_count > 0 and unused_samples:
         random.seed(seed)
         selected_samples = random.sample(unused_samples, min(need_count, len(unused_samples)))
         eval_samples.extend(selected_samples)
-        print(f"已添加 {len(selected_samples)} 个样本到eval")
+        print(f"Added {len(selected_samples)} samples to eval")
     elif need_count > 0:
-        print(f"警告: 未找到足够的未使用style样本（需要 {need_count} 个，但只有 {len(unused_samples)} 个可用）")
+        print(f"Warning: not enough unused style samples (need {need_count}, only {len(unused_samples)} available)")
     
     return eval_samples
 
 
 def main():
-    """主函数"""
+    """Main function"""
     print("=" * 80)
-    print("Customization数据拆分脚本")
+    print("Customization data split script")
     print("=" * 80)
-    print(f"\nEval样本数配置: {EVAL_COUNTS}")
-    print(f"随机种子: {RANDOM_SEED}")
+    print(f"\nEval sample count config: {EVAL_COUNTS}")
+    print(f"Random seed: {RANDOM_SEED}")
     
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     
-    # 统计信息
+    # Statistics
     all_statistics = {}
     
-    # 处理每个类别
+    # Process each category
     for class_name, eval_count in EVAL_COUNTS.items():
         print("\n" + "=" * 80)
         if eval_count is None or eval_count <= 0:
-            print(f"处理类别: {class_name} (eval样本数: 0，全部用于train)")
+            print(f"Processing category: {class_name} (eval count: 0, all for train)")
         else:
-            print(f"处理类别: {class_name} (eval样本数: {eval_count})")
+            print(f"Processing category: {class_name} (eval count: {eval_count})")
         print("=" * 80)
         
-        # 对于style类别，从processed/customization继承现有的eval和train分组
+        # For style category, inherit existing eval and train split from processed/customization
         if class_name == 'style':
-            # 加载现有的train和eval数据
+            # Load existing train and eval data
             train_jsonl_path = DATA_DIR / f"{class_name}_train.jsonl"
             eval_jsonl_path = DATA_DIR / f"{class_name}_eval.jsonl"
             
             train_samples = load_jsonl(train_jsonl_path) if train_jsonl_path.exists() else []
             eval_samples = load_jsonl(eval_jsonl_path) if eval_jsonl_path.exists() else []
             
-            print(f"从processed/customization继承: train={len(train_samples)}, eval={len(eval_samples)}")
+            print(f"Inherited from processed/customization: train={len(train_samples)}, eval={len(eval_samples)}")
             
-            # 如果eval数量不足，从未使用的数据中扩展
+            # If eval count is insufficient, extend from unused data
             if len(eval_samples) < eval_count:
                 eval_samples = extend_style_eval_from_unused(
                     eval_samples,
@@ -554,7 +554,7 @@ def main():
                     RANDOM_SEED
                 )
             
-            # 确保train_samples中不包含eval_samples中的样本
+            # Ensure train_samples does not contain samples already in eval_samples
             eval_filepaths = {s.get('filepath', '') for s in eval_samples if s.get('filepath')}
             filtered_train_samples = [
                 s for s in train_samples 
@@ -562,21 +562,21 @@ def main():
             ]
             train_samples = filtered_train_samples
         else:
-            # 加载jsonl文件
+            # Load jsonl file
             jsonl_path = DATA_DIR / f"{class_name}.jsonl"
             samples = load_jsonl(jsonl_path)
             
             if not samples:
-                print(f"警告: 类别 {class_name} 没有数据，跳过")
+                print(f"Warning: category {class_name} has no data, skipping")
                 continue
             
-            # 对于scene类别，使用特殊处理
+            # For scene category, use special handling
             if class_name == 'scene':
                 train_samples, eval_samples = split_scene_samples(samples, eval_count, RANDOM_SEED)
             else:
                 train_samples, eval_samples = split_samples(samples, eval_count, RANDOM_SEED)
             
-            # 如果eval数量不足，从已有数据中扩展
+            # If eval count is insufficient, extend from existing data
             if eval_count and eval_count > 0 and len(eval_samples) < eval_count:
                 eval_samples = extend_eval_from_existing(
                     eval_samples,
@@ -587,8 +587,8 @@ def main():
                     RANDOM_SEED
                 )
             
-            # Train数量自动计算为（总数据量 - eval数量）
-            # 注意：这里需要确保eval_samples中的样本不会出现在train_samples中
+            # Train count is automatically (total - eval count)
+            # Note: ensure eval_samples samples do not appear in train_samples
             eval_combination_keys = set()
             for sample in eval_samples:
                 files = []
@@ -602,7 +602,7 @@ def main():
                     combination_key = get_combination_key(file_names)
                     eval_combination_keys.add(combination_key)
             
-            # 从train_samples中移除已在eval中的样本
+            # Remove samples already in eval from train_samples
             filtered_train_samples = []
             for sample in train_samples:
                 files = []
@@ -621,53 +621,53 @@ def main():
             
             train_samples = filtered_train_samples
         
-        print(f"Train样本数: {len(train_samples)}")
-        print(f"Eval样本数: {len(eval_samples)}")
+        print(f"Train sample count: {len(train_samples)}")
+        print(f"Eval sample count: {len(eval_samples)}")
         
-        # 保存train.json
+        # Save train.json
         if train_samples:
             train_path = OUTPUT_DIR / f"{class_name}_train.json"
             save_json(train_samples, train_path)
-            print(f"已保存train数据到: {train_path}")
+            print(f"Saved train data to: {train_path}")
         
-        # 保存eval.json
+        # Save eval.json
         if eval_samples:
             eval_path = OUTPUT_DIR / f"{class_name}_eval.json"
             save_json(eval_samples, eval_path)
-            print(f"已保存eval数据到: {eval_path}")
+            print(f"Saved eval data to: {eval_path}")
         
-        # 记录统计信息
+        # Record statistics
         all_statistics[class_name] = {
             'total': len(train_samples) + len(eval_samples),
             'train': len(train_samples),
             'eval': len(eval_samples)
         }
     
-    # 打印统计信息
+    # Print statistics
     print("\n" + "=" * 80)
-    print("拆分统计信息")
+    print("Split statistics")
     print("=" * 80)
     total_train = 0
     total_eval = 0
     total_all = 0
     
     for class_name, stats in sorted(all_statistics.items()):
-        print(f"\n类别: {class_name}")
-        print(f"  总样本数: {stats['total']}")
-        print(f"  Train样本数: {stats['train']}")
-        print(f"  Eval样本数: {stats['eval']}")
+        print(f"\nCategory: {class_name}")
+        print(f"  Total samples: {stats['total']}")
+        print(f"  Train samples: {stats['train']}")
+        print(f"  Eval samples: {stats['eval']}")
         total_train += stats['train']
         total_eval += stats['eval']
         total_all += stats['total']
     
     print("\n" + "=" * 80)
-    print(f"总计样本数: {total_all}")
-    print(f"总计Train样本数: {total_train}")
-    print(f"总计Eval样本数: {total_eval}")
+    print(f"Total samples: {total_all}")
+    print(f"Total Train samples: {total_train}")
+    print(f"Total Eval samples: {total_eval}")
     print("=" * 80)
     
     print("\n" + "=" * 80)
-    print("所有类别处理完成！")
+    print("All categories processing complete!")
     print("=" * 80)
 
 

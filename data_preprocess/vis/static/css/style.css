@@ -17,7 +17,7 @@ body {
     padding: 20px;
 }
 
-/* 头部样式 */
+/* Header styles */
 .header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -32,7 +32,7 @@ body {
     font-weight: 600;
 }
 
-/* 筛选器样式 */
+/* Filter styles */
 .filters {
     background: white;
     padding: 20px;
@@ -79,7 +79,7 @@ body {
     box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-/* 当前选择显示 */
+/* Current selection display */
 .current-selection {
     background: white;
     padding: 15px 20px;
@@ -113,7 +113,7 @@ body {
     font-size: 14px;
 }
 
-/* 加载提示 */
+/* Loading indicator */
 .loading {
     text-align: center;
     padding: 40px;
@@ -138,7 +138,7 @@ body {
     100% { transform: rotate(360deg); }
 }
 
-/* 错误提示 */
+/* Error message */
 .error-message {
     background: #fee;
     color: #c33;
@@ -148,13 +148,13 @@ body {
     border-left: 4px solid #c33;
 }
 
-/* 样本容器 */
+/* Sample container */
 .samples-container {
     display: grid;
     gap: 20px;
 }
 
-/* 样本卡片 */
+/* Sample card */
 .sample-card {
     background: white;
     border-radius: 10px;
@@ -197,7 +197,7 @@ body {
     color: #333;
 }
 
-/* 文本内容 */
+/* Text content */
 .sample-text {
     margin-bottom: 20px;
     padding: 15px;
@@ -209,7 +209,7 @@ body {
     color: #444;
 }
 
-/* 图片区域 */
+/* Image area */
 .images-section {
     margin-bottom: 15px;
 }
@@ -226,7 +226,7 @@ body {
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 15px;
     margin-bottom: 15px;
-    justify-items: start;  /* 图像居左 */
+    justify-items: start;  /* Images aligned left */
 }
 
 .image-item {
@@ -270,19 +270,19 @@ body {
     font-size: 12px;
 }
 
-/* 输出图片单独显示 */
+/* Output image displayed separately */
 .output-image-container {
     margin-top: 15px;
     display: flex;
-    justify-content: flex-start;  /* 图像居左 */
+    justify-content: flex-start;  /* Images aligned left */
 }
 
 .output-image-item {
     max-width: 400px;
-    margin: 0;  /* 移除自动居中 */
+    margin: 0;  /* Remove auto-centering */
 }
 
-/* 其他信息 */
+/* Other info */
 .sample-info {
     margin-top: 15px;
     padding-top: 15px;
@@ -309,7 +309,7 @@ body {
     flex: 1;
 }
 
-/* 评分相关 */
+/* Score related */
 .score-item {
     display: inline-block;
     background: #e8f0fe;
@@ -321,7 +321,7 @@ body {
     font-weight: 500;
 }
 
-/* 浮动按钮组 */
+/* Floating button group */
 .floating-buttons {
     position: fixed;
     bottom: 30px;
@@ -333,7 +333,7 @@ body {
     align-items: flex-end;
 }
 
-/* 浮动分页按钮 */
+/* Floating pagination buttons */
 .floating-pagination {
     background: white;
     padding: 12px 18px;
@@ -386,7 +386,7 @@ body {
     white-space: nowrap;
 }
 
-/* 返回顶部按钮 */
+/* Back to top button */
 .back-to-top-btn {
     width: 50px;
     height: 50px;
@@ -431,7 +431,7 @@ body {
     transform: translateY(-2px);
 }
 
-/* 图片模态框 */
+/* Image modal */
 .image-modal {
     display: none;
     position: fixed;
@@ -471,7 +471,7 @@ body {
     opacity: 0.7;
 }
 
-/* 响应式设计 */
+/* Responsive design */
 @media (max-width: 768px) {
     .filters {
         flex-direction: column;

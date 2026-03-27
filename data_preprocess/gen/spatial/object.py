@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Spatial Object数据生成脚本
+Spatial Object data generation script
 
-功能：
-1. 从split/spatial目录读取train/eval数据（object子类型）
-2. 从多视角物体图像中采样数据
-3. 保存到final/spatial/{train/eval}/{image_count_category}/data和json目录
-4. 支持唯一识别编号，避免重复生成
+Features:
+1. Read train/eval data from split/spatial directory (object subtype)
+2. Sample data from multi-viewpoint object images
+3. Save to final/spatial/{train/eval}/{image_count_category}/data and json directories
+4. Support unique IDs to avoid duplicate generation
 """
 
 import json
@@ -17,7 +17,7 @@ from typing import Dict, List, Set, Optional, Tuple
 from tqdm import tqdm
 from PIL import Image
 
-# 添加utils路径
+# Add utils path
 CURRENT_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(CURRENT_DIR))
 
@@ -28,11 +28,11 @@ from utils.common import (
     generate_unique_id
 )
 
-# ====== 配置参数 ======
+# ====== Configuration parameters ======
 SPLIT_DIR = (Path(__file__).resolve().parent.parent.parent.parent / "data" / "split" / "spatial")
 FINAL_DIR = (Path(__file__).resolve().parent.parent.parent.parent / "data" / "final" / "spatial")
 
-# 生成配置：{image_count_category: {train: count, eval: count}}
+# Generation config: {image_count_category: {train: count, eval: count}}
 GEN_CONFIG = {
     "1-3": {"train": 10000, "eval": 0},
     "4-5": {"train": 0, "eval": 0},
@@ -40,11 +40,11 @@ GEN_CONFIG = {
     ">=8": {"train": 0, "eval": 0},
 }
 
-# 视角方向定义
+# Viewpoint direction definitions
 VIEW_DIRECTIONS = ['front', 'back', 'left', 'right', 'top', 'bottom', 
                    'front_left', 'front_right', 'back_left', 'back_right']
 
-# 视角名称映射（用于生成prompt）
+# Viewpoint name mapping (for prompt generation)
 VIEW_NAMES = {
     'front': 'front',
     'front_left': 'front-left',
@@ -58,7 +58,7 @@ VIEW_NAMES = {
     'bottom': 'bottom',
 }
 
-# 高层视角偏移（相对于front，mod 24）
+# High-layer viewpoint offsets (relative to front, mod 24)
 HIGH_LAYER_OFFSETS = {
     'front': 0,
     'front_right': 3,
@@ -70,21 +70,21 @@ HIGH_LAYER_OFFSETS = {
     'front_left': 21,
 }
 
-# 随机种子
+# Random seed
 RANDOM_SEED = 42
 # ======================
 
 
 def get_frame_indices_for_view(front_frame: int, view: str) -> List[int]:
     """
-    给定正面帧和视角，返回可能的帧索引列表（可能有高层和低层两个选择）
+    Given a front frame and a viewpoint, return the list of possible frame indices (may have high-layer and low-layer options)
     
     Args:
-        front_frame: 正面视角的帧号（0-23，高层）
-        view: 视角名称
+        front_frame: front viewpoint frame number (0-23, high layer)
+        view: viewpoint name
     
     Returns:
-        可能的帧索引列表
+        list of possible frame indices
     """
     if view == 'top':
         return [25]
@@ -94,22 +94,22 @@ def get_frame_indices_for_view(front_frame: int, view: str) -> List[int]:
     if view not in HIGH_LAYER_OFFSETS:
         return []
     
-    # 高层帧计算
+    # High-layer frame calculation
     high_offset = HIGH_LAYER_OFFSETS[view]
     high_frame = (front_frame + high_offset) % 24
     
-    # 检查是否有对应的低层帧
-    # 高层 +2n 对应低层 +n
-    # 低层帧范围 27-39（共13帧，27和39相同）
-    # 只有front, right, back, left有对应低层帧（即高层帧号为偶数时）
+    # Check whether there is a corresponding low-layer frame
+    # High-layer +2n corresponds to low-layer +n
+    # Low-layer frame range 27-39 (13 frames total, 27 and 39 are the same)
+    # Only front, right, back, left have corresponding low-layer frames (when high-layer frame number is even)
     
     candidates = [high_frame]
     
     total_high_offset = high_frame
-    if total_high_offset % 2 == 0:  # 存在对应的低层帧
+    if total_high_offset % 2 == 0:  # There is a corresponding low-layer frame
         total_low_offset = total_high_offset // 2
         low_frame = 27 + (total_low_offset % 12)
-        assert low_frame <= 39, f"低层帧号超出范围: {low_frame}"
+        assert low_frame <= 39, f"Low-layer frame number out of range: {low_frame}"
         candidates.append(low_frame)
     
     return candidates
@@ -117,31 +117,31 @@ def get_frame_indices_for_view(front_frame: int, view: str) -> List[int]:
 
 def sample_frame_for_view(front_frame: int, view: str) -> int:
     """
-    给定正面帧和视角，随机采样一个帧
+    Given a front frame and a viewpoint, randomly sample one frame
     
     Args:
-        front_frame: 正面视角的帧号（0-23，高层）
-        view: 视角名称
+        front_frame: front viewpoint frame number (0-23, high layer)
+        view: viewpoint name
     
     Returns:
-        帧索引
+        frame index
     """
     candidates = get_frame_indices_for_view(front_frame, view)
     if not candidates:
-        return front_frame  # 默认返回正面帧
+        return front_frame  # Default: return front frame
     
     return random.choice(candidates)
 
 
 def get_adjacent_views(view: str) -> List[str]:
     """
-    获取指定视角的临近视角列表
+    Get the list of adjacent viewpoints for the specified viewpoint
     
     Args:
-        view: 视角名称
+        view: viewpoint name
     
     Returns:
-        临近视角列表
+        list of adjacent viewpoints
     """
     adjacent_map = {
         'front': ['front_left', 'front_right'],
@@ -158,7 +158,7 @@ def get_adjacent_views(view: str) -> List[str]:
 
 def generate_prompt(input_views: List[str], output_view: str) -> str:
     """
-    生成描述输入和输出视角的prompt
+    Generate a prompt describing input and output viewpoints
     """
     view_descriptions = []
     for i, view in enumerate(input_views, 1):
@@ -173,13 +173,13 @@ def generate_prompt(input_views: List[str], output_view: str) -> str:
 
 def get_all_objects(source_dir: Path) -> List[Path]:
     """
-    获取所有物体目录
+    Get all object directories
     
     Args:
-        source_dir: 源目录
+        source_dir: source directory
     
     Returns:
-        物体目录列表
+        list of object directories
     """
     objects = []
     if not source_dir.exists():
@@ -200,82 +200,82 @@ def sample_one(
     sampling_config: Optional[Dict] = None
 ) -> Optional[Dict]:
     """
-    从一个物体目录采样一个样本
+    Sample one sample from an object directory
     
     Args:
-        obj_dir: 物体目录路径
-        num_input_views: 输入视角数量
+        obj_dir: object directory path
+        num_input_views: number of input viewpoints
     
     Returns:
-        样本数据或None
+        sample data or None
     """
     rgb_dir = obj_dir / 'rgb'
     if not rgb_dir.exists():
         return None
     
-    # 检查是否有足够的图像文件
+    # Check whether there are enough image files
     image_files = sorted(list(rgb_dir.glob('*.jpg')) + list(rgb_dir.glob('*.png')))
-    if len(image_files) < 24:  # 至少需要24个高层帧
+    if len(image_files) < 24:  # At least 24 high-layer frames required
         return None
     
-    # 获取配置参数
+    # Get configuration parameters
     if sampling_config is None:
         sampling_config = {}
     front_frame_range = sampling_config.get("front_frame_range", list(range(24)))
-    view_constraint_mode = sampling_config.get("view_constraint_mode", 1)  # 默认使用约束方式1
+    view_constraint_mode = sampling_config.get("view_constraint_mode", 1)  # Default: use constraint mode 1
     
-    # 随机选择正面帧（front_frame_range 应该是一个列表，包含所有可选的 front frame 值，如 [0, 1, 2, ..., 23] 或 [0, 6, 12, 18]）
+    # Randomly select front frame (front_frame_range should be a list of all valid front frame values, e.g. [0,1,...,23] or [0,6,12,18])
     if isinstance(front_frame_range, list) and len(front_frame_range) > 0:
         front_frame = random.choice(front_frame_range)
     else:
-        # 默认使用 0-23
+        # Default: use 0-23
         front_frame = random.randint(0, 23)
     
-    # 可用的视角方向
+    # Available viewpoint directions
     available_views = [v for v in VIEW_DIRECTIONS if v != 'front']
     
-    # 需要约束的视角（前后左右及其组合视角）
+    # Viewpoints that require constraints (front/back/left/right and their combinations)
     constrained_views = ['front', 'back', 'left', 'right', 
                          'front_left', 'front_right', 'back_left', 'back_right']
     
-    # 随机选择输出视角
+    # Randomly select output viewpoint
     if len(available_views) < 1:
         return None
     
-    # 尝试多次采样，确保满足约束条件
+    # Try multiple times to ensure constraints are satisfied
     max_sampling_attempts = 100
     input_views = None
     output_view = None
     
     for attempt in range(max_sampling_attempts):
-        # 随机选择输出视角
+        # Randomly select output viewpoint
         output_view = random.choice(available_views)
         
-        # 根据约束方式选择不同的采样逻辑
+        # Choose sampling logic based on constraint mode
         if view_constraint_mode == 1:
-            # 约束方式1：如果output_view是前后左右等，需要包含临近视角
+            # Constraint mode 1: if output_view is front/back/left/right etc., must include adjacent views
             if output_view in constrained_views:
                 adjacent_views = get_adjacent_views(output_view)
-                # 从可用视角中找出可用的临近视角（排除output_view本身）
+                # Find available adjacent viewpoints (excluding output_view itself)
                 available_adjacent = [v for v in adjacent_views if v in available_views and v != output_view]
                 
-                # 如果没有可用的临近视角，跳过这个output_view
+                # If no adjacent viewpoints available, skip this output_view
                 if not available_adjacent:
                     continue
                 
-                # 剩余的可用视角（排除output_view）
+                # Remaining available viewpoints (excluding output_view)
                 remaining_views = [v for v in available_views if v != output_view]
                 
-                # 如果剩余视角数量不足，跳过
+                # If not enough remaining viewpoints, skip
                 if len(remaining_views) < num_input_views:
                     continue
                 
-                # 确保至少选择一个临近视角
-                # 从临近视角中至少选一个
+                # Ensure at least one adjacent viewpoint is selected
+                # Select at least one from adjacent viewpoints
                 num_adjacent_to_include = random.randint(1, min(len(available_adjacent), num_input_views))
                 selected_adjacent = random.sample(available_adjacent, num_adjacent_to_include)
                 
-                # 剩余的输入视角从其他可用视角中选择
+                # Select remaining input viewpoints from other available viewpoints
                 remaining_needed = num_input_views - num_adjacent_to_include
                 if remaining_needed > 0:
                     other_views = [v for v in remaining_views if v not in selected_adjacent]
@@ -286,32 +286,32 @@ def sample_one(
                 else:
                     input_views = selected_adjacent
             else:
-                # 输出视角不需要约束，正常选择
+                # Output viewpoint needs no constraint, select normally
                 remaining_views = [v for v in available_views if v != output_view]
                 if len(remaining_views) < num_input_views:
                     continue
                 input_views = random.sample(remaining_views, num_input_views)
         
         elif view_constraint_mode == 2:
-            # 约束方式2：无论目标视角是什么，一定要有前后左右、前左、前右、后左、后右中的一个视角
+            # Constraint mode 2: regardless of target viewpoint, must include one of front/back/left/right/front-left/front-right/back-left/back-right
             remaining_views = [v for v in available_views if v != output_view]
             
-            # 检查是否有足够的视角
+            # Check whether there are enough viewpoints
             if len(remaining_views) < num_input_views:
                 continue
             
-            # 从constrained_views中找出可用的视角（排除output_view本身）
+            # Find available constrained viewpoints (excluding output_view itself)
             available_constrained = [v for v in constrained_views if v in available_views and v != output_view]
             
-            # 如果没有可用的约束视角，跳过
+            # If no constrained viewpoints available, skip
             if not available_constrained:
                 continue
             
-            # 确保至少选择一个约束视角
+            # Ensure at least one constrained viewpoint is selected
             num_constrained_to_include = random.randint(1, min(len(available_constrained), num_input_views))
             selected_constrained = random.sample(available_constrained, num_constrained_to_include)
             
-            # 剩余的输入视角从其他可用视角中选择
+            # Select remaining input viewpoints from other available viewpoints
             remaining_needed = num_input_views - num_constrained_to_include
             if remaining_needed > 0:
                 other_views = [v for v in remaining_views if v not in selected_constrained]
@@ -323,36 +323,36 @@ def sample_one(
                 input_views = selected_constrained
         
         elif view_constraint_mode == 3:
-            # 约束方式3：无约束，正常随机选择
+            # Constraint mode 3: no constraint, random selection
             remaining_views = [v for v in available_views if v != output_view]
             if len(remaining_views) < num_input_views:
                 continue
             input_views = random.sample(remaining_views, num_input_views)
         
         else:
-            # 未知的约束方式，使用默认方式（无约束）
+            # Unknown constraint mode, use default (no constraint)
             remaining_views = [v for v in available_views if v != output_view]
             if len(remaining_views) < num_input_views:
                 continue
             input_views = random.sample(remaining_views, num_input_views)
         
-        # 如果成功选择了视角，跳出循环
+        # If viewpoints were successfully selected, exit the loop
         if input_views is not None:
             break
     
-    # 如果经过多次尝试仍无法满足约束，返回None
+    # If constraints cannot be satisfied after multiple attempts, return None
     if input_views is None or output_view is None:
         return None
     
-    # 加载输入图像
+    # Load input images
     input_images = []
     
     for view in input_views:
         frame_idx = sample_frame_for_view(front_frame, view)
-        # 尝试找到对应的图像文件（可能命名格式不同）
+        # Try to find the corresponding image file (naming format may differ)
         frame_file = None
         for img_file in image_files:
-            # 尝试从文件名中提取帧号
+            # Try to extract frame number from filename
             try:
                 frame_num = int(img_file.stem.split('_')[-1] or img_file.stem.split('.')[0])
                 if frame_num == frame_idx:
@@ -362,7 +362,7 @@ def sample_one(
                 continue
         
         if frame_file is None:
-            # 如果找不到，尝试使用索引
+            # If not found, try using index
             if frame_idx < len(image_files):
                 frame_file = image_files[frame_idx]
             else:
@@ -372,13 +372,13 @@ def sample_one(
             img = Image.open(frame_file)
             input_images.append(img)
         except Exception as e:
-            print(f"加载图像失败 {frame_file}: {e}")
+            print(f"Failed to load image {frame_file}: {e}")
             continue
     
     if len(input_images) != num_input_views:
         return None
     
-    # 加载输出图像
+    # Load output image
     output_frame_idx = sample_frame_for_view(front_frame, output_view)
     output_frame_file = None
     for img_file in image_files:
@@ -399,35 +399,35 @@ def sample_one(
     try:
         output_image = Image.open(output_frame_file)
     except Exception as e:
-        print(f"加载输出图像失败 {output_frame_file}: {e}")
+        print(f"Failed to load output image {output_frame_file}: {e}")
         return None
     
     return {
         'obj_dir': obj_dir,
         'front_frame': front_frame,
         'input_images': input_images,
-        'input_views': input_views,  # 返回原始视角键（下划线格式）
+        'input_views': input_views,  # Return original viewpoint keys (underscore format)
         'output_image': output_image,
-        'output_view': output_view  # 返回原始视角键（下划线格式）
+        'output_view': output_view  # Return original viewpoint key (underscore format)
     }
 
 
 def load_split_data(split_dir: Path, split_type: str, sub_type: str) -> List[Dict]:
     """
-    从split目录加载数据
+    Load data from split directory
     
     Args:
-        split_dir: split目录
-        split_type: "train" 或 "eval"
-        sub_type: 子类型（"object"）
+        split_dir: split directory
+        split_type: "train" or "eval"
+        sub_type: subtype ("object")
     
     Returns:
-        样本列表
+        list of samples
     """
     json_file = split_dir / f"{sub_type}_{split_type}.json"
     
     if not json_file.exists():
-        # 兼容旧格式：尝试读取txt文件
+        # Compatibility with old format: try to read txt file
         txt_file = split_dir / f"{sub_type}_{split_type}.txt"
         if txt_file.exists():
             samples = []
@@ -460,33 +460,33 @@ def process_split_data(
     sampling_config: Optional[Dict] = None
 ) -> None:
     """
-    处理split数据并生成最终数据
+    Process split data and generate final data
     
     Args:
-        split_dir: split目录
-        final_dir: final目录
-        split_type: "train" 或 "eval"
-        image_count_category: 图像数量类别
-        target_count: 目标生成数量
-        generated_ids: 已生成的唯一ID集合
-        sub_type: 子类型（"object"）
+        split_dir: split directory
+        final_dir: final directory
+        split_type: "train" or "eval"
+        image_count_category: image count category
+        target_count: target generation count
+        generated_ids: set of already-generated unique IDs
+        sub_type: subtype ("object")
     """
-    # 加载split数据
+    # Load split data
     samples = load_split_data(split_dir, split_type, sub_type)
     
     if not samples:
-        print(f"未找到 {split_type}/{sub_type} 数据")
+        print(f"No data found for {split_type}/{sub_type}")
         return
     
-    # 设置随机种子
+    # Set random seed
     random.seed(RANDOM_SEED)
     
-    # 处理样本
-    completed = len(generated_ids)  # 从已生成数量开始计数
+    # Process samples
+    completed = len(generated_ids)  # Start count from already-generated count
     current_idx = len(generated_ids)
-    max_attempts = target_count * 10  # 最多尝试次数
+    max_attempts = target_count * 10  # Maximum number of attempts
     
-    # 统计信息
+    # Statistics
     total_attempts = 0
     successful_attempts = 0
     
@@ -503,7 +503,7 @@ def process_split_data(
             attempt += 1
             total_attempts += 1
             
-            # 根据image_count_category为每个样本随机确定输入视角数量
+            # Randomly determine input viewpoint count per sample based on image_count_category
             if image_count_category == "1-3":
                 num_input_views = random.randint(1, 3)
             elif image_count_category == "4-5":
@@ -511,23 +511,23 @@ def process_split_data(
             elif image_count_category == "6-7":
                 num_input_views = random.randint(6, 7)
             else:  # >=8
-                num_input_views = random.randint(8, 9)  # 最多9个输入视角
+                num_input_views = random.randint(8, 9)  # At most 9 input viewpoints
             
-            # 随机选择一个物体
+            # Randomly select an object
             sample = random.choice(samples)
             obj_dir = sample['obj_dir']
             
-            # 采样一个样本
+            # Sample one sample
             sampled = sample_one(obj_dir, num_input_views, sampling_config)
             if not sampled:
                 continue
             
-            # 生成唯一ID
-            # 构建 view_config 字符串，包含视角配置信息（使用转换后的名称）
+            # Generate unique ID
+            # Build view_config string with viewpoint configuration info (using converted names)
             input_view_names = [VIEW_NAMES[v] for v in sampled['input_views']]
             output_view_name = VIEW_NAMES[sampled['output_view']]
             view_config = f"f{sampled['front_frame']:02d}_i{','.join(sorted(input_view_names))}_o{output_view_name}"
-            # 如果 SAVE_ORIGINAL_STRING=True，需要获取原始字符串以便保存
+            # If SAVE_ORIGINAL_STRING=True, get the original string for saving
             from utils.common import SAVE_ORIGINAL_STRING
             unique_id_result = generate_unique_id(
                 "spatial",
@@ -537,22 +537,22 @@ def process_split_data(
                 view_config=view_config
             )
             
-            # 提取用于检查的唯一ID（如果是元组，使用 MD5 哈希；如果是字符串，直接使用）
+            # Extract unique ID for checking (use MD5 hash if tuple, or use string directly)
             unique_id = unique_id_result[0] if isinstance(unique_id_result, tuple) else unique_id_result
             
             if unique_id in generated_ids:
                 continue
             
-            # 生成prompt（使用原始视角键）
+            # Generate prompt (using original viewpoint keys)
             prompt = generate_prompt(sampled['input_views'], sampled['output_view'])
             
-            # 准备图像文件
+            # Prepare image files
             image_files = {}
             for i, img in enumerate(sampled['input_images']):
                 image_files[f"image_{i+1}.jpg"] = img
             image_files["image_output.jpg"] = sampled['output_image']
             
-            # 构建预期的图像路径（save_sample_data会更新为实际路径）
+            # Build expected image paths (save_sample_data will update to actual paths)
             if sub_type:
                 data_dir = final_dir / split_type / sub_type / image_count_category / "data" / f"{current_idx:08d}"
             else:
@@ -561,7 +561,7 @@ def process_split_data(
             input_image_paths = [str(data_dir / f"image_{i+1}.jpg") for i in range(len(sampled['input_images']))]
             output_image_path = str(data_dir / "image_output.jpg")
             
-            # 构建JSON数据（使用转换后的名称）
+            # Build JSON data (using converted names)
             json_data = {
                 'obj_dir': str(obj_dir),
                 'front_frame': sampled['front_frame'],
@@ -573,19 +573,19 @@ def process_split_data(
                 'output_image': output_image_path
             }
             
-            # 保存数据（对于object，需要按子类型分类保存）
+            # Save data (for object, save under subtype directory)
             from utils.common import save_sample_data
-            # 对于object，路径为 final/spatial/{train/eval}/object/{image_count_category}/...
-            # 注意：这里 sub_type 已经是 "object"，所以路径会自动包含它
+            # For object, path is final/spatial/{train/eval}/object/{image_count_category}/...
+            # Note: sub_type is already "object", so the path will automatically include it
             success = save_sample_data(
                 final_dir,
                 split_type,
                 image_count_category,
                 current_idx,
-                unique_id_result,  # 可能是字符串或 (md5_hash, original_string) 元组
+                unique_id_result,  # May be a string or (md5_hash, original_string) tuple
                 json_data,
                 image_files,
-                sub_type=sub_type  # 传递子类型以支持分类保存
+                sub_type=sub_type  # Pass subtype to support categorized saving
             )
             
             if success:
@@ -595,47 +595,47 @@ def process_split_data(
                 current_idx += 1
                 pbar.update(1)
                 
-                # 更新进度条描述，显示详细统计信息
+                # Update progress bar description with detailed statistics
                 success_rate = (successful_attempts / total_attempts * 100) if total_attempts > 0 else 0
                 pbar.set_description(
                     f"{split_type}/{image_count_category} | "
-                    f"完成:{completed}/{target_count} | "
-                    f"尝试:{total_attempts} | "
-                    f"成功率:{success_rate:.1f}%"
+                    f"Done:{completed}/{target_count} | "
+                    f"Attempts:{total_attempts} | "
+                    f"SuccessRate:{success_rate:.1f}%"
                 )
     
-    print(f"\n{split_type}/{image_count_category} 完成: {completed}/{target_count}")
+    print(f"\n{split_type}/{image_count_category} done: {completed}/{target_count}")
 
 
 def main():
-    """主函数"""
+    """Main function"""
     print("=" * 80)
-    print("Spatial Object数据生成脚本")
+    print("Spatial Object data generation script")
     print("=" * 80)
-    print(f"Split目录: {SPLIT_DIR}")
-    print(f"Final目录: {FINAL_DIR}")
-    print(f"生成配置: {GEN_CONFIG}")
+    print(f"Split directory: {SPLIT_DIR}")
+    print(f"Final directory: {FINAL_DIR}")
+    print(f"Generation config: {GEN_CONFIG}")
     print("=" * 80)
     
-    # 创建final目录
+    # Create final directory
     FINAL_DIR.mkdir(parents=True, exist_ok=True)
     
-    # 处理train和eval数据
+    # Process train and eval data
     for split_type in ["train", "eval"]:
-        print(f"\n处理 {split_type} 数据...")
+        print(f"\nProcessing {split_type} data...")
         
         for image_count_category, config in GEN_CONFIG.items():
             target_count = config.get(split_type, 0)
             
             if target_count <= 0:
-                print(f"跳过 {split_type}/{image_count_category} 数据生成（目标数量为0）")
+                print(f"Skipping {split_type}/{image_count_category} data generation (target count is 0)")
                 continue
             
-            # 加载已生成的唯一识别编号
+            # Load already-generated unique IDs
             generated_ids = load_generated_ids(FINAL_DIR, split_type, image_count_category)
-            print(f"已加载 {len(generated_ids)} 个已生成的样本ID")
+            print(f"Loaded {len(generated_ids)} already-generated sample IDs")
             
-            # 处理数据
+            # Process data
             process_split_data(
                 split_dir=SPLIT_DIR,
                 final_dir=FINAL_DIR,
@@ -646,7 +646,7 @@ def main():
                 sub_type="object"
             )
     
-    print("\n处理完成！")
+    print("\nProcessing complete!")
 
 
 if __name__ == "__main__":

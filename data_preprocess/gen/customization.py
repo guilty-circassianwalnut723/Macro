@@ -1,21 +1,21 @@
 #!/usr/bin/env python3
 """
-Customization数据生成脚本
+Customization data generation script
 
-功能：
-1. 从split/customization目录读取train/eval数据
-2. 使用gemini生成图像
-3. 保存到final/customization/{train/eval}/{image_count_category}/data和json目录
-4. 支持唯一识别编号，避免重复生成
+Features:
+1. Read train/eval data from split/customization directory
+2. Generate images using Gemini
+3. Save to final/customization/{train/eval}/{image_count_category}/data and json directories
+4. Support unique IDs to avoid duplicate generation
 
-使用方法:
+Usage:
     python customization.py
 
-配置说明:
-    - 修改 SPLIT_DIR 为 split/customization 目录路径
-    - 修改 FINAL_DIR 为 final/customization 目录路径
-    - 设置 GEMINI_API_KEY 环境变量或直接修改配置
-    - 设置 GEMINI_API_URL 和 IMAGE_API_URL 环境变量
+Configuration:
+    - Set SPLIT_DIR to the split/customization directory path
+    - Set FINAL_DIR to the final/customization directory path
+    - Set GEMINI_API_KEY via environment variable or modify the config directly
+    - Set GEMINI_API_URL and IMAGE_API_URL environment variables
 """
 
 import json
@@ -33,7 +33,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from PIL import Image
 
-# 添加utils路径
+# Add utils path
 CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(CURRENT_DIR))
 
@@ -45,7 +45,7 @@ from utils.common import (
     get_combination_key
 )
 
-# 确保项目根目录在路径中
+# Ensure project root is in sys.path
 ROOT_DIR = CURRENT_DIR
 while ROOT_DIR != ROOT_DIR.parent:
     if (ROOT_DIR / 'api_generator').exists():
@@ -62,25 +62,25 @@ if ROOT_DIR_STR not in sys.path:
 from api_generator.text_generator.gemini_api import GeminiAPIGenerator
 from api_generator.image_generator.nano_api import NanoAPIGenerator
 
-# ====== 配置参数 ======
-# 修改为您的实际路径
-MACRO_DIR = CURRENT_DIR.parent.parent  # Macro 根目录
+# ====== Configuration parameters ======
+# Change to your actual paths
+MACRO_DIR = CURRENT_DIR.parent.parent  # Macro root directory
 DATA_DIR = MACRO_DIR / "data"
 SPLIT_DIR = DATA_DIR / "split" / "customization"
 FINAL_DIR = DATA_DIR / "final" / "customization"
 
-# Gemini API 配置
-# 通过环境变量设置 API Key 和 URL
+# Gemini API configuration
+# Set API Key and URL via environment variables
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_API_URL = os.getenv("GEMINI_API_URL", "")
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
-# 图像生成 API 配置
+# Image generation API configuration
 IMAGE_API_KEY = os.getenv("IMAGE_API_KEY", "")
 IMAGE_API_URL = os.getenv("IMAGE_API_URL", "")
 IMAGE_MODEL_NAME = os.getenv("IMAGE_MODEL_NAME", "gemini-image-preview")
 
-# 生成配置：{image_count_category: {train: count, eval: count}}
+# Generation config: {image_count_category: {train: count, eval: count}}
 GEN_CONFIG = {
     "1-3": {"train": 20000, "eval": 250},
     "4-5": {"train": 20000, "eval": 250},
@@ -88,27 +88,27 @@ GEN_CONFIG = {
     ">=8": {"train": 60000, "eval": 250},
 }
 
-# 线程配置
+# Thread configuration
 MAX_WORKERS = 128
 MAX_TRIES = 3
-MAX_ATTEMPTS = 10  # 每个样本最大尝试次数
-PASS_THRESHOLD = 8  # 通过阈值
+MAX_ATTEMPTS = 10  # Max attempts per sample
+PASS_THRESHOLD = 8  # Pass threshold
 
-# 随机种子
+# Random seed
 RANDOM_SEED = 42
 
-# 数据采样比例配置（human, cloth, object, scene, style）
+# Data sampling ratio config (human, cloth, object, scene, style)
 DATA_RATIO = [0.4, 0.1, 0.3, 0.15, 0.05]
 
-# 日志配置
-LOG_TO_SHELL = False  # 是否输出日志到shell
+# Logging configuration
+LOG_TO_SHELL = False  # Whether to output logs to shell
 # ======================
 
-# ====== 线程局部存储 ======
+# ====== Thread-local storage ======
 thread_local = threading.local()
 # =============================
 
-# ====== 全局进度跟踪变量 ======
+# ====== Global progress tracking variables ======
 progress_lock = threading.Lock()
 progress_stats = {
     'completed': 0,
@@ -118,14 +118,14 @@ progress_stats = {
 }
 # =============================
 
-# ====== 全局组合字典锁 ======
+# ====== Global combination dict lock ======
 combination_lock = threading.Lock()
 
-# ====== 唯一ID检查锁 ======
+# ====== Unique ID check lock ======
 unique_id_lock = threading.Lock()
 # =============================
 
-# ====== Prompt模板 ======
+# ====== Prompt template ======
 GEN_PROMPT = """
 You will receive several reference images. Each image is tagged as exactly one of the following categories: {human, cloth, object, scene, style}.
 
@@ -173,10 +173,10 @@ def load_combination_dict(final_dir: Path, split_type: str, image_count_category
             with open(combo_next_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 if isinstance(data, dict) and len(data) > 0:
-                    print(f"从 combination_dict_next.json 加载了 {len(data)} 条组合记录")
+                    print(f"Loaded {len(data)} combination records from combination_dict_next.json")
                     return data
         except Exception as e:
-            print(f"警告: 加载 combination_dict_next.json 失败: {e}")
+            print(f"Warning: failed to load combination_dict_next.json: {e}")
 
     combo_file = save_dir / "combination_dict.json"
     if combo_file.exists():
@@ -184,10 +184,10 @@ def load_combination_dict(final_dir: Path, split_type: str, image_count_category
             with open(combo_file, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 if isinstance(data, dict):
-                    print(f"从 combination_dict.json 加载了 {len(data)} 条组合记录")
+                    print(f"Loaded {len(data)} combination records from combination_dict.json")
                     return data
         except Exception as e:
-            print(f"警告: 加载组合字典失败: {e}")
+            print(f"Warning: failed to load combination dict: {e}")
     return {}
 
 
@@ -217,12 +217,12 @@ def save_combination_dict(combination_dict: Dict, final_dir: Path, split_type: s
                         if len(prev_data) >= len(current_dict):
                             is_valid = True
             except Exception as e:
-                print(f"警告: 读取上一次的 combination_dict_next.json 失败: {e}")
+                print(f"Warning: failed to read previous combination_dict_next.json: {e}")
                 is_valid = False
 
             if is_valid:
                 shutil.copy2(combo_next_file, combo_file)
-                print(f"已用上一次保存的数据更新 combination_dict.json（{len(prev_data)} 条记录）")
+                print(f"Updated combination_dict.json with previously saved data ({len(prev_data)} records)")
 
         with combination_lock:
             combination_dict_copy = dict(combination_dict)
@@ -233,9 +233,9 @@ def save_combination_dict(combination_dict: Dict, final_dir: Path, split_type: s
         with open(combo_next_file, 'w', encoding='utf-8') as f:
             json.dump(combination_dict_copy, f, ensure_ascii=False, indent=2)
 
-        print(f"已保存 combination_dict_next.json（{len(combination_dict_copy)} 条记录）")
+        print(f"Saved combination_dict_next.json ({len(combination_dict_copy)} records)")
     except Exception as e:
-        print(f"警告: 保存组合字典失败: {e}")
+        print(f"Warning: failed to save combination dict: {e}")
 
 
 def get_or_create_logger(thread_id: int, save_root: Path) -> logging.Logger:
@@ -311,11 +311,11 @@ def retry_with_generator_update(
             result = operation_func()
             return result
         except Exception as e:
-            logger.warning(f"样本 {sample_id} {operation_name} 第 {attempt + 1} 次尝试失败: {e}")
+            logger.warning(f"Sample {sample_id} {operation_name} attempt {attempt + 1} failed: {e}")
             if attempt < max_retries - 1:
                 time.sleep(wait_time)
             else:
-                logger.error(f"样本 {sample_id} {operation_name} 所有重试均失败")
+                logger.error(f"Sample {sample_id} {operation_name} all retries failed")
                 raise
     return None
 
@@ -331,7 +331,7 @@ def load_json(json_path: Path) -> List[Dict]:
             else:
                 return []
     except Exception as e:
-        print(f"警告: 读取JSON文件失败 {json_path}: {e}")
+        print(f"Warning: failed to read JSON file {json_path}: {e}")
         return []
 
 
@@ -496,7 +496,7 @@ def worker_task(
             try:
                 images = [Image.open(Path(f)) for f in selected_files]
             except Exception as e:
-                logger.warning(f"[Sample {idx}] 加载图像失败: {e}")
+                logger.warning(f"[Sample {idx}] Failed to load image: {e}")
                 continue
 
             def text_generation_operation():
@@ -595,7 +595,7 @@ def worker_task(
     try:
         images = [Image.open(Path(f)) for f in selected_files]
     except Exception as e:
-        logger.warning(f"[Sample {idx}] 加载图像失败: {e}")
+        logger.warning(f"[Sample {idx}] Failed to load image: {e}")
         with combination_lock:
             if combination_key in combination_dict and isinstance(combination_dict[combination_key], dict):
                 combination_dict[combination_key]['used'] = False
@@ -681,7 +681,7 @@ def worker_task(
                 generated_ids.discard(unique_id)
             return None
     except Exception as e:
-        logger.warning(f"[Sample {idx}] 保存生成图像失败: {e}")
+        logger.warning(f"[Sample {idx}] Failed to save generated image: {e}")
         with combination_lock:
             if combination_key in combination_dict and isinstance(combination_dict[combination_key], dict):
                 combination_dict[combination_key]['used'] = False
@@ -803,7 +803,7 @@ def process_split_data(
                                     completed_count += 1
                                     pbar.update(1)
                             except Exception as e:
-                                print(f"任务执行异常: {e}")
+                                print(f"Task execution exception: {e}")
                             done_futures.append(future)
 
                     for future in done_futures:
@@ -827,7 +827,7 @@ def process_split_data(
                             completed_count += 1
                             pbar.update(1)
                     except Exception as e:
-                        print(f"任务执行异常: {e}")
+                        print(f"Task execution exception: {e}")
 
                     current_time = time.time()
                     if current_time - last_save_time >= save_interval:
@@ -835,41 +835,41 @@ def process_split_data(
                         last_save_time = current_time
     finally:
         save_combination_dict(combination_dict, final_dir, split_type, image_count_category)
-        print(f"[{split_type}/{image_count_category}] 最终保存组合字典（{len(combination_dict)} 条记录）")
+        print(f"[{split_type}/{image_count_category}] Final save of combination dict ({len(combination_dict)} records)")
 
-    print(f"\n{split_type}/{image_count_category} 完成: {completed_count}/{target_count}")
+    print(f"\n{split_type}/{image_count_category} done: {completed_count}/{target_count}")
 
 
 def main():
     print("=" * 80)
-    print("Customization数据生成脚本")
+    print("Customization data generation script")
     print("=" * 80)
-    print(f"Split目录: {SPLIT_DIR}")
-    print(f"Final目录: {FINAL_DIR}")
-    print(f"生成配置: {GEN_CONFIG}")
+    print(f"Split directory: {SPLIT_DIR}")
+    print(f"Final directory: {FINAL_DIR}")
+    print(f"Generation config: {GEN_CONFIG}")
     print("=" * 80)
 
     if not GEMINI_API_KEY:
-        print("警告: GEMINI_API_KEY 未设置，请通过环境变量设置")
+        print("Warning: GEMINI_API_KEY is not set, please set it via environment variable")
     if not GEMINI_API_URL:
-        print("警告: GEMINI_API_URL 未设置，请通过环境变量设置")
+        print("Warning: GEMINI_API_URL is not set, please set it via environment variable")
     if not IMAGE_API_KEY:
-        print("警告: IMAGE_API_KEY 未设置，请通过环境变量设置")
+        print("Warning: IMAGE_API_KEY is not set, please set it via environment variable")
 
     FINAL_DIR.mkdir(parents=True, exist_ok=True)
 
     for split_type in ["train", "eval"]:
-        print(f"\n处理 {split_type} 数据...")
+        print(f"\nProcessing {split_type} data...")
 
         for image_count_category, config in GEN_CONFIG.items():
             target_count = config.get(split_type, 0)
 
             if target_count <= 0:
-                print(f"跳过 {split_type}/{image_count_category} 数据生成（目标数量为0）")
+                print(f"Skipping {split_type}/{image_count_category} data generation (target count is 0)")
                 continue
 
             generated_ids = load_generated_ids(FINAL_DIR, split_type, image_count_category)
-            print(f"已加载 {len(generated_ids)} 个已生成的样本ID")
+            print(f"Loaded {len(generated_ids)} already-generated sample IDs")
 
             process_split_data(
                 split_dir=SPLIT_DIR,
@@ -880,7 +880,7 @@ def main():
                 generated_ids=generated_ids,
             )
 
-    print("\n处理完成！")
+    print("\nProcessing complete!")
 
 
 if __name__ == "__main__":

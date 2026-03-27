@@ -26,8 +26,8 @@ dataset_snapshot_download(
 control_video = VideoData("data/examples/wan/control_video.mp4", height=832, width=576)
 reference_image = Image.open("data/examples/wan/reference_image_girl.png").resize((576, 832))
 video = pipe(
-    prompt="扁平风格动漫，一位长发少女优雅起舞。她五官精致，大眼睛明亮有神，黑色长发柔顺光泽。身穿淡蓝色T恤和深蓝色牛仔短裤。背景是粉色。",
-    negative_prompt="色调艳丽，过曝，静态，细节模糊不清，字幕，风格，作品，画作，画面，静止，整体发灰，最差质量，低质量，JPEG压缩残留，丑陋的，残缺的，多余的手指，画得不好的手部，画得不好的脸部，畸形的，毁容的，形态畸形的肢体，手指融合，静止不动的画面，杂乱的背景，三条腿，背景人很多，倒着走",
+    prompt="Flat-style anime, a long-haired girl dances gracefully. She has delicate features, bright and expressive large eyes, and glossy black long hair. She wears a light blue T-shirt and dark blue denim shorts. The background is pink.",
+    negative_prompt="vivid colors, overexposed, static, blurry details, subtitles, stylized, artwork, painting, illustration, still, overall gray, worst quality, low quality, JPEG compression artifacts, ugly, incomplete, extra fingers, poorly drawn hands, poorly drawn face, deformed, disfigured, malformed limbs, fused fingers, frozen frame, cluttered background, three legs, many people in background, walking backwards",
     control_video=control_video, reference_image=reference_image,
     height=832, width=576, num_frames=49,
     seed=1, tiled=True

@@ -1,31 +1,31 @@
 #!/usr/bin/env python3
 """
-Spatial数据生成统一脚本
+Spatial data generation unified script
 
-功能：
-1. 统一控制outdoor、indoor、object三个子类型的生成配置和数量
-2. 从split/spatial目录读取train/eval数据
-3. 保存到final/spatial/{train/eval}/{image_count_category}/data和json目录
-4. 支持唯一识别编号，避免重复生成
+Features:
+1. Unified control of generation config and count for outdoor, indoor, object subtypes
+2. Read train/eval data from split/spatial directory
+3. Save to final/spatial/{train/eval}/{image_count_category}/data and json directories
+4. Support unique IDs to avoid duplicate generation
 """
 
 import json
 import sys
 from pathlib import Path
 
-# 添加utils路径
+# Add utils path
 CURRENT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(CURRENT_DIR))
 
-# ====== 配置参数 ======
+# ====== Configuration parameters ======
 SPLIT_DIR = (Path(__file__).resolve().parent.parent.parent / "data" / "split" / "spatial")
 FINAL_DIR = (Path(__file__).resolve().parent.parent.parent / "data" / "final" / "spatial")
 
-# 子类型选择：outdoor、indoor或object
-# 设置为 None 或 [] 表示处理所有子类型，设置为具体子类型字符串则只处理该子类型
-SUB_TYPE = None  # 修改此值来选择要处理的子类型，None表示处理所有子类型
+# Subtype selection: outdoor, indoor, or object
+# Set to None or [] to process all subtypes, or a specific subtype string to process only that subtype
+SUB_TYPE = None  # Modify this value to select the subtype to process; None processes all subtypes
 
-# 生成配置：{sub_type: {image_count_category: {train: count, eval: count}}}
+# Generation config: {sub_type: {image_count_category: {train: count, eval: count}}}
 GEN_CONFIG = {
     "object": {
         "1-3": {"train": 12000, "eval": 90},
@@ -47,77 +47,77 @@ GEN_CONFIG = {
     },
 }
 
-# 采样参数配置：{sub_type: {param_name: value}}
-# 参考 runner/spatial/gen 目录下的脚本参数
+# Sampling parameter config: {sub_type: {param_name: value}}
+# See script parameters in runner/spatial/gen directory
 SAMPLING_CONFIG = {
     "outdoor": {
-        "min_overlap": 0.3,      # 最小重叠比例
-        "max_overlap": 0.8,      # 最大重叠比例
-        "min_fov": 90.0,         # 最小视野角度（度）
-        "max_fov": 90.0,         # 最大视野角度（度）
-        "image_size": [1024, 1024],  # 输出图像尺寸 [height, width]
-        "add_noise": False,      # 是否添加视角扰动
-        "noise_scale": 10.0,     # 视角扰动幅度（度）
-        "base_pitch_range": [-10, 10],  # base_pitch的随机范围（度），使用 random.uniform(base_pitch_range[0], base_pitch_range[1])
+        "min_overlap": 0.3,      # Minimum overlap ratio
+        "max_overlap": 0.8,      # Maximum overlap ratio
+        "min_fov": 90.0,         # Minimum field of view (degrees)
+        "max_fov": 90.0,         # Maximum field of view (degrees)
+        "image_size": [1024, 1024],  # Output image size [height, width]
+        "add_noise": False,      # Whether to add viewpoint perturbation
+        "noise_scale": 10.0,     # Viewpoint perturbation magnitude (degrees)
+        "base_pitch_range": [-10, 10],  # Random range for base_pitch (degrees), using random.uniform(base_pitch_range[0], base_pitch_range[1])
     },
     "indoor": {
-        "min_overlap": 0.3,      # 最小重叠比例
-        "max_overlap": 0.8,      # 最大重叠比例
-        "min_fov": 90.0,         # 最小视野角度（度）
-        "max_fov": 90.0,         # 最大视野角度（度）
-        "image_size": [1024, 1024],  # 输出图像尺寸 [height, width]
-        "add_noise": False,      # 是否添加视角扰动
-        "noise_scale": 10.0,     # 视角扰动幅度（度）
-        "base_pitch_range": [-10, 10],  # base_pitch的随机范围（度），使用 random.uniform(base_pitch_range[0], base_pitch_range[1])
+        "min_overlap": 0.3,      # Minimum overlap ratio
+        "max_overlap": 0.8,      # Maximum overlap ratio
+        "min_fov": 90.0,         # Minimum field of view (degrees)
+        "max_fov": 90.0,         # Maximum field of view (degrees)
+        "image_size": [1024, 1024],  # Output image size [height, width]
+        "add_noise": False,      # Whether to add viewpoint perturbation
+        "noise_scale": 10.0,     # Viewpoint perturbation magnitude (degrees)
+        "base_pitch_range": [-10, 10],  # Random range for base_pitch (degrees), using random.uniform(base_pitch_range[0], base_pitch_range[1])
     },
     "object": {
-        "front_frame_range": list(range(24)),  # front_frame的可选值列表，所有可选的 front frame 值（0-23）
-        "view_constraint_mode": 1,  # 视角约束方式：1=当前约束（如果output_view是前后左右等，需要包含临近视角），2=必须包含前后左右等视角之一，3=无约束
+        "front_frame_range": list(range(24)),  # List of valid front_frame values, all selectable front frame values (0-23)
+        "view_constraint_mode": 1,  # Viewpoint constraint mode: 1=current constraint (if output_view is front/back/left/right etc., must include adjacent views), 2=must include one of front/back/left/right etc., 3=no constraint
     },
 }
 # ======================
 
 
 def main():
-    """主函数"""
-    # 确定要处理的子类型列表
+    """Main function"""
+    # Determine the list of subtypes to process
     if SUB_TYPE is None:
-        # 处理所有子类型
+        # Process all subtypes
         sub_types_to_process = list(GEN_CONFIG.keys())
         print("=" * 80)
-        print("Spatial 数据生成脚本 - 处理所有子类型")
+        print("Spatial data generation script - processing all subtypes")
         print("=" * 80)
     else:
-        # 只处理指定的子类型
+        # Process only the specified subtype
         if SUB_TYPE not in GEN_CONFIG:
-            raise ValueError(f"不支持的子类型: {SUB_TYPE}，支持的类型: {list(GEN_CONFIG.keys())}")
+            raise ValueError(f"Unsupported subtype: {SUB_TYPE}, supported types: {list(GEN_CONFIG.keys())}")
         sub_types_to_process = [SUB_TYPE]
         print("=" * 80)
-        print(f"Spatial {SUB_TYPE.upper()}数据生成脚本")
+        print(f"Spatial {SUB_TYPE.upper()} data generation script")
         print("=" * 80)
     
-    print(f"Split目录: {SPLIT_DIR}")
-    print(f"Final目录: {FINAL_DIR}")
-    print(f"将处理的子类型: {sub_types_to_process}")
+    print(f"Split directory: {SPLIT_DIR}")
+    print(f"Final directory: {FINAL_DIR}")
+    print(f"Subtypes to process: {sub_types_to_process}")
     print("=" * 80)
     
-    # 创建final目录
+    # Create final directory
     FINAL_DIR.mkdir(parents=True, exist_ok=True)
     
-    # 遍历处理每个子类型
+    # Iterate over and process each subtype
     for current_sub_type in sub_types_to_process:
         print(f"\n{'=' * 80}")
-        print(f"开始处理子类型: {current_sub_type.upper()}")
+        print(f"Starting to process subtype: {current_sub_type.upper()}")
         print(f"{'=' * 80}")
         
         gen_config = GEN_CONFIG[current_sub_type]
         sampling_config = SAMPLING_CONFIG.get(current_sub_type, {})
         
-        print(f"生成配置: {gen_config}")
-        print(f"采样配置: {sampling_config}")
+        print(f"Generation config: {gen_config}")
+        print(f"Sampling config: {sampling_config}")
         
-        # 导入对应的处理模块
-        # 注意：spatial.py在gen目录下，outdoor/indoor/object.py在gen/spatial目录下
+        # Import the corresponding processing module
+        # Note: spatial.py is in the gen directory; outdoor/indoor/object.py are in gen/spatial
         if current_sub_type == "outdoor":
             from spatial.outdoor import process_split_data
             from utils.common import load_generated_ids
@@ -128,24 +128,24 @@ def main():
             from spatial.object import process_split_data
             from utils.common import load_generated_ids
         else:
-            raise ValueError(f"不支持的子类型: {current_sub_type}")
+            raise ValueError(f"Unsupported subtype: {current_sub_type}")
         
-        # 处理train和eval数据
+        # Process train and eval data
         for split_type in ["train", "eval"]:
-            print(f"\n处理 {current_sub_type}/{split_type} 数据...")
+            print(f"\nProcessing {current_sub_type}/{split_type} data...")
             
             for image_count_category, config in gen_config.items():
                 target_count = config.get(split_type, 0)
                 
                 if target_count <= 0:
-                    print(f"跳过 {current_sub_type}/{split_type}/{image_count_category} 数据生成（目标数量为0）")
+                    print(f"Skipping {current_sub_type}/{split_type}/{image_count_category} data generation (target count is 0)")
                     continue
                 
-                # 加载已生成的唯一识别编号（对于spatial，需要传递sub_type）
+                # Load already-generated unique IDs (for spatial, sub_type must be passed)
                 generated_ids = load_generated_ids(FINAL_DIR, split_type, image_count_category, sub_type=current_sub_type)
-                print(f"已加载 {len(generated_ids)} 个已生成的样本ID")
+                print(f"Loaded {len(generated_ids)} already-generated sample IDs")
                 
-                # 处理数据
+                # Process data
                 process_split_data(
                     split_dir=SPLIT_DIR,
                     final_dir=FINAL_DIR,
@@ -157,10 +157,10 @@ def main():
                     sampling_config=sampling_config
                 )
         
-        print(f"\n子类型 {current_sub_type.upper()} 处理完成！")
+        print(f"\nSubtype {current_sub_type.upper()} processing complete!")
     
     print(f"\n{'=' * 80}")
-    print("所有子类型处理完成！")
+    print("All subtypes processing complete!")
     print(f"{'=' * 80}")
 
 

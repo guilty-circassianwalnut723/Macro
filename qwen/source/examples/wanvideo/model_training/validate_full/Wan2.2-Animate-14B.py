@@ -22,7 +22,7 @@ input_image = VideoData("data/example_video_dataset/animate/animate_output.mp4",
 animate_pose_video = VideoData("data/examples/wan/animate/animate_pose_video.mp4", height=480, width=832).raw_data()[:81-4]
 animate_face_video = VideoData("data/examples/wan/animate/animate_face_video.mp4", height=512, width=512).raw_data()[:81-4]
 video = pipe(
-    prompt="视频中的人在做动作",
+    prompt="The person in the video is performing an action",
     seed=0, tiled=True,
     input_image=input_image,
     animate_pose_video=animate_pose_video,

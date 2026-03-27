@@ -31,6 +31,6 @@ lora_state_dict = load_state_dict("models/MusePublic/Qwen-Image-Distill/qwen_ima
 lora_state_dict = {i.replace("base_model.model.", "").replace(".weight", ".default.weight"): j for i, j in lora_state_dict.items()}
 pipe.load_lora(pipe.dit, state_dict=lora_state_dict, hotload=True)
 
-prompt = "精致肖像，水下少女，蓝裙飘逸，发丝轻扬，光影透澈，气泡环绕，面容恬静，细节精致，梦幻唯美。"
+prompt = "Exquisite portrait, underwater girl, blue dress flowing, hair gently swaying, light and shadow translucent, bubbles surrounding, serene expression, intricate details, dreamy and beautiful."
 image = pipe(prompt, seed=0, num_inference_steps=3, cfg_scale=1, exponential_shift_mu=math.log(2.5))
 image.save("image.jpg")

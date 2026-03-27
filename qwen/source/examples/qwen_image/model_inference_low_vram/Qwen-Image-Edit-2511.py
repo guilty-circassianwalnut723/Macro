@@ -30,7 +30,7 @@ dataset_snapshot_download(
     local_dir="data/example_image_dataset",
 )
 
-prompt = "生成这两个人的合影"
+prompt = "Generate a group photo of these two people"
 edit_image = [
     Image.open("data/example_image_dataset/qwen_image_edit/image1.jpg"),
     Image.open("data/example_image_dataset/qwen_image_edit/image2.jpg"),

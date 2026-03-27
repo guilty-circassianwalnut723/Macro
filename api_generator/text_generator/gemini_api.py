@@ -171,18 +171,18 @@ class GeminiAPIGenerator(APIGenerator):
         for i in range(self.max_try):
             try:
                 if self.print_log:
-                    print(f"开始第{i+1}次请求", flush=True)
+                    print(f"Starting request {i+1}", flush=True)
                 ret = requests.post(self.usage_app_url, data=payload, headers=headers, timeout=self.timeout)
                 if ret.status_code == 200:
                     output = self.deal_response(ret, response_format)
                     if self.print_log:
-                        print(f"第{i+1}次请求成功", flush=True)
+                        print(f"Request {i+1} succeeded", flush=True)
                     return output
                 else:
-                    raise Exception(f"状态码：{ret.status_code}, {self.trans_state(ret.status_code)}")
+                    raise Exception(f"Status code: {ret.status_code}, {self.trans_state(ret.status_code)}")
             except Exception as e:
                 if self.print_log:
-                    print(f"请求异常：{e}", flush=True)
+                    print(f"Request exception: {e}", flush=True)
                 time.sleep(10)
                 continue
 

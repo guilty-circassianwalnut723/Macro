@@ -1,14 +1,14 @@
 """
-OmniGen 推理数据加载工具
+OmniGen inference data loading utilities
 
-从 Macro/data/filter/{task}/eval 目录下加载不同task的eval数据
-使用统一的 common_utils 模块
+Loads eval data for different tasks from Macro/data/filter/{task}/eval directory.
+Uses the unified common_utils module.
 """
 
 import sys
 from pathlib import Path
 
-# 添加 inference_utils 路径
+# Add inference_utils path
 SCRIPT_DIR = Path(__file__).parent
 OMNIGEN_DIR = SCRIPT_DIR.parent
 MACRO_DIR = OMNIGEN_DIR.parent
@@ -17,7 +17,7 @@ INFERENCE_UTILS_DIR = MACRO_DIR / "inference_utils"
 if str(INFERENCE_UTILS_DIR) not in sys.path:
     sys.path.insert(0, str(INFERENCE_UTILS_DIR))
 
-# 从 common_utils 导入所有函数
+# Import all functions from common_utils
 from common_utils import (
     SUPPORTED_TASKS,
     IMAGE_NUM_CATEGORIES,
@@ -25,7 +25,7 @@ from common_utils import (
     parse_image_num_category,
     matches_image_num_category,
     load_eval_data,
-    load_data_for_task,  # 统一的数据加载接口
+    load_data_for_task,  # unified data loading interface
     filter_samples_by_image_num,
     get_available_tasks,
     get_available_categories,
@@ -34,10 +34,10 @@ from common_utils import (
     get_data_root,
 )
 
-# 为了向后兼容，定义 DATA_ROOT
+# Define DATA_ROOT for backward compatibility
 DATA_ROOT = get_data_root(MACRO_DIR)
 
-# 重新导出所有函数，确保向后兼容
+# Re-export all functions to ensure backward compatibility
 __all__ = [
     'SUPPORTED_TASKS',
     'IMAGE_NUM_CATEGORIES',
@@ -46,7 +46,7 @@ __all__ = [
     'parse_image_num_category',
     'matches_image_num_category',
     'load_eval_data',
-    'load_data_for_task',  # 统一的数据加载接口
+    'load_data_for_task',  # unified data loading interface
     'filter_samples_by_image_num',
     'get_available_tasks',
     'get_available_categories',

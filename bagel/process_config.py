@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """
-Bagel 配置处理脚本 - 从config.yaml读取配置并生成训练所需文件
+Bagel configuration processing script - reads config.yaml and generates files needed for training.
 
-保持原有的训练配置格式：
-- dataset_config.yaml: 训练数据配置
-- merged_parquet_info.json: 合并的parquet信息
-- run.sh / run_local.sh: 训练启动脚本
+Preserves the original training configuration format:
+- dataset_config.yaml: training data configuration
+- merged_parquet_info.json: merged parquet info
+- run.sh / run_local.sh: training launch scripts
 
-去除hope相关逻辑，只保留本地运行（支持多机多卡）
+Removes hope-related logic; keeps only local execution (supports multi-node multi-GPU).
 
-使用方法:
+Usage:
     python process_config.py --exp_name <experiment_name>
     python process_config.py --list
     python process_config.py --all
@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 
 
-# 目录配置（使用相对路径）
+# Directory configuration (using relative paths)
 SCRIPT_DIR = Path(__file__).parent.resolve()
 MACRO_DIR = SCRIPT_DIR.parent
 CONFIG_FILE = SCRIPT_DIR / "config.yaml"
@@ -37,13 +37,13 @@ CKPTS_DIR = MACRO_DIR / "ckpts"
 
 
 def load_config() -> dict:
-    """加载配置文件"""
+    """Load configuration file."""
     with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
 
 
 def check_t2i_data_prepared(data_dir: Path) -> bool:
-    """检查T2I数据是否已准备（Parquet格式）"""
+    """Check whether T2I data has been prepared (Parquet format)."""
     parquet_info_path = data_dir / "parquet_info.json"
     if not parquet_info_path.exists():
         return False
@@ -56,41 +56,41 @@ def check_t2i_data_prepared(data_dir: Path) -> bool:
         return False
 
 
-def prepare_t2i_data(t2i_jsonl_path: str, output_dir: Path, 
+def prepare_t2i_data(t2i_jsonl_path: str, output_dir: Path,
                      max_records_per_file: int = 1000) -> Tuple[Optional[Path], int, int]:
-    """准备T2I数据：从JSONL转换为Parquet格式"""
+    """Prepare T2I data: convert from JSONL to Parquet format."""
     try:
         import pyarrow as pa
         import pyarrow.parquet as pq
     except ImportError:
-        print("错误: 需要安装 pyarrow: pip install pyarrow")
+        print("Error: pyarrow is required: pip install pyarrow")
         return None, 0, 0
-    
+
     output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # 检查是否已准备
+
+    # Check if already prepared
     parquet_info_path = output_dir / "parquet_info.json"
     if parquet_info_path.exists():
         with open(parquet_info_path, 'r', encoding='utf-8') as f:
             existing_info = json.load(f)
         has_file_keys = any(k.endswith('.parquet') for k in existing_info.keys())
         if has_file_keys:
-            print(f"T2I数据已存在，跳过准备: {output_dir}")
+            print(f"T2I data already exists, skipping preparation: {output_dir}")
             return output_dir, existing_info.get('original_count', 0), existing_info.get('num_total_samples', 0)
         else:
-            print("T2I parquet_info.json 格式不正确，重新生成")
+            print("T2I parquet_info.json format is invalid, regenerating")
             for old_file in output_dir.glob("t2i_*.parquet"):
                 old_file.unlink()
-    
-    print(f"准备T2I数据: {t2i_jsonl_path} -> {output_dir}")
+
+    print(f"Preparing T2I data: {t2i_jsonl_path} -> {output_dir}")
     
     t2i_path = Path(t2i_jsonl_path)
     if not t2i_path.exists():
-        # 尝试相对于MACRO_DIR的路径
+        # Try path relative to MACRO_DIR
         t2i_path = MACRO_DIR / t2i_jsonl_path
-    
+
     if not t2i_path.exists():
-        print(f"警告: T2I JSONL文件不存在: {t2i_jsonl_path}")
+        print(f"Warning: T2I JSONL file not found: {t2i_jsonl_path}")
         return None, 0, 0
     
     data_list = []
@@ -105,7 +105,7 @@ def prepare_t2i_data(t2i_jsonl_path: str, output_dir: Path,
             
             try:
                 data = json.loads(line)
-                # 支持两种格式
+                # Support two formats
                 if 'messages' in data:
                     messages = data.get('messages', [])
                     instruction = ""
@@ -129,7 +129,7 @@ def prepare_t2i_data(t2i_jsonl_path: str, output_dir: Path,
                     output_image_path = data.get('output_image', data.get('image', ''))
                 
                 if instruction and output_image_path:
-                    # 转换为绝对路径
+                    # Convert to absolute path
                     if not os.path.isabs(output_image_path):
                         output_image_path = str(MACRO_DIR / output_image_path)
                         
@@ -142,12 +142,12 @@ def prepare_t2i_data(t2i_jsonl_path: str, output_dir: Path,
                 continue
     
     converted_count = len(data_list)
-    print(f"  处理完成: 原始 {original_count} 行, 有效数据 {converted_count} 条")
-    
+    print(f"  Processing complete: {original_count} original rows, {converted_count} valid records")
+
     if not data_list:
         return None, original_count, converted_count
-    
-    # 写入Parquet文件
+
+    # Write Parquet files
     parquet_files = []
     parquet_file_info = {}
     num_files = (len(data_list) + max_records_per_file - 1) // max_records_per_file
@@ -191,12 +191,12 @@ def prepare_t2i_data(t2i_jsonl_path: str, output_dir: Path,
     with open(output_dir / 'parquet_info.json', 'w', encoding='utf-8') as f:
         json.dump(parquet_info, f, indent=2, ensure_ascii=False)
     
-    print(f"T2I数据准备完成: {num_files} 个文件, {converted_count} 条记录")
+    print(f"T2I data preparation complete: {num_files} files, {converted_count} records")
     return output_dir, original_count, converted_count
 
 
 def adjust_data_to_target_num(data_list: List[dict], target_num: int) -> List[dict]:
-    """根据目标数量调整数据"""
+    """Adjust data list to the target count."""
     if not data_list:
         return []
     
@@ -214,21 +214,21 @@ def adjust_data_to_target_num(data_list: List[dict], target_num: int) -> List[di
         return result[:target_num]
 
 
-def convert_multiref_to_parquet(json_dir: Path, output_dir: Path, 
+def convert_multiref_to_parquet(json_dir: Path, output_dir: Path,
                                  target_num: int = 0,
                                  max_records_per_file: int = 1000,
                                  force_regenerate: bool = False) -> Tuple[int, int, int]:
-    """将MultiRef JSON数据转换为Parquet格式"""
+    """Convert MultiRef JSON data to Parquet format."""
     try:
         import pyarrow as pa
         import pyarrow.parquet as pq
     except ImportError:
-        print("错误: 需要安装 pyarrow")
+        print("Error: pyarrow is required")
         return 0, 0, 0
-    
+
     output_dir.mkdir(parents=True, exist_ok=True)
-    
-    # 检查是否已转换
+
+    # Check if already converted
     parquet_info_path = output_dir / 'parquet_info.json'
     
     if not force_regenerate and parquet_info_path.exists():
@@ -241,21 +241,21 @@ def convert_multiref_to_parquet(json_dir: Path, output_dir: Path,
             num_files = info.get('num_files', 0)
             num_samples = info.get('num_total_samples', 0)
             original_count = info.get('original_samples', num_samples)
-            print(f"    Parquet数据已存在: {num_files} 文件, {num_samples} 样本")
+            print(f"    Parquet data already exists: {num_files} files, {num_samples} samples")
             return num_files, original_count, num_samples
         else:
             if not has_file_keys:
-                print("    parquet_info.json 格式不正确，重新生成")
+                print("    parquet_info.json format is invalid, regenerating")
             else:
-                print(f"    target_num已更改 ({old_target_num} -> {target_num})，重新生成")
+                print(f"    target_num changed ({old_target_num} -> {target_num}), regenerating")
             for old_file in output_dir.glob("chunk_*.parquet"):
                 old_file.unlink()
     
     if not json_dir.exists():
-        print(f"    警告: JSON目录不存在: {json_dir}")
+        print(f"    Warning: JSON directory not found: {json_dir}")
         return 0, 0, 0
-    
-    # 读取JSON文件
+
+    # Read JSON files
     raw_data_list = []
     json_files = sorted(json_dir.glob("*.json"))
     
@@ -296,14 +296,14 @@ def convert_multiref_to_parquet(json_dir: Path, output_dir: Path,
     
     original_count = len(raw_data_list)
     
-    # 调整数据数量
+    # Adjust data count
     data_list = adjust_data_to_target_num(raw_data_list, target_num)
     converted_count = len(data_list)
-    
+
     if converted_count == 0:
         return 0, original_count, 0
-    
-    # 写入Parquet
+
+    # Write Parquet
     num_files = (converted_count + max_records_per_file - 1) // max_records_per_file
     parquet_files = []
     parquet_file_info = {}
@@ -350,14 +350,14 @@ def convert_multiref_to_parquet(json_dir: Path, output_dir: Path,
     with open(parquet_info_path, 'w', encoding='utf-8') as f:
         json.dump(parquet_info, f, indent=2, ensure_ascii=False)
     
-    print(f"    转换完成: {original_count} -> {converted_count} 样本, {num_files} 文件")
+    print(f"    Conversion complete: {original_count} -> {converted_count} samples, {num_files} files")
     return num_files, original_count, converted_count
 
 
-def prepare_multiref_data(multiref_data_root: Path, data_config: Dict, 
-                          parquet_dir: Path, 
+def prepare_multiref_data(multiref_data_root: Path, data_config: Dict,
+                          parquet_dir: Path,
                           force_regenerate: bool = False) -> Tuple[List[Dict], List[Dict]]:
-    """准备多参考图数据"""
+    """Prepare multi-reference image data."""
     multi_ref_data_dirs = []
     statistics_list = []
     
@@ -368,7 +368,7 @@ def prepare_multiref_data(multiref_data_root: Path, data_config: Dict,
             
             target_num = cat_config.get('data_num', 0)
             
-            print(f"  处理: {task}/{category}, 目标数量: {target_num}")
+            print(f"  Processing: {task}/{category}, target count: {target_num}")
             
             num_files, original_count, converted_count = convert_multiref_to_parquet(
                 src_json_dir, dest_parquet_dir,
@@ -397,7 +397,7 @@ def prepare_multiref_data(multiref_data_root: Path, data_config: Dict,
 def create_dataset_config_yaml(exp_name: str, exp_config: dict, global_config: dict,
                                 exp_dir: Path, t2i_data_dir: Optional[Path],
                                 multi_ref_data_dirs: List[Dict]) -> Path:
-    """创建 dataset_config.yaml 训练配置"""
+    """Create dataset_config.yaml training configuration."""
     use_t2i = exp_config.get('use_t2i', False)
     vae_size = exp_config.get('vae_size', global_config.get('default_vae_size', [768, 512]))
     vit_size = exp_config.get('vit_size', global_config.get('default_vit_size', [336, 224]))
@@ -412,7 +412,7 @@ def create_dataset_config_yaml(exp_name: str, exp_config: dict, global_config: d
     vae_max_size, vae_min_size = vae_size
     vit_max_size, vit_min_size = vit_size
     
-    # 构建 data_dirs 和 num_used_data
+    # Build data_dirs and num_used_data
     data_dirs_yaml = ""
     num_used_data_yaml = ""
     parquet_info_paths = []
@@ -425,7 +425,7 @@ def create_dataset_config_yaml(exp_name: str, exp_config: dict, global_config: d
         if parquet_info_path.exists():
             parquet_info_paths.append(str(parquet_info_path))
     
-    # 合并parquet_info
+    # Merge parquet_info
     parquet_info_path_yaml = ""
     if parquet_info_paths:
         merged_parquet_info = {}
@@ -441,11 +441,11 @@ def create_dataset_config_yaml(exp_name: str, exp_config: dict, global_config: d
             with open(merged_info_path, 'w', encoding='utf-8') as f:
                 json.dump(merged_parquet_info, f, indent=2, ensure_ascii=False)
             parquet_info_path_yaml = str(merged_info_path.resolve())
-            print(f"已合并 {len(parquet_info_paths)} 个parquet_info.json到: {merged_info_path}")
+            print(f"Merged {len(parquet_info_paths)} parquet_info.json files into: {merged_info_path}")
     
     multi_ref_weight = int(multiref_ratio * 10)
     
-    # 生成 max_input_pixels YAML
+    # Generate max_input_pixels YAML
     if max_input_pixels is not None:
         if isinstance(max_input_pixels, (list, tuple)):
             max_input_pixels_yaml = f"    max_input_pixels: [{', '.join(str(p) for p in max_input_pixels)}]"
@@ -473,7 +473,7 @@ def create_dataset_config_yaml(exp_name: str, exp_config: dict, global_config: d
   weight: {multi_ref_weight}
 """
     
-    # 添加T2I配置
+    # Add T2I configuration
     if use_t2i and t2i_data_dir and t2i_data_dir.exists():
         t2i_parquet_info = t2i_data_dir / 'parquet_info.json'
         t2i_num_files = 10
@@ -506,25 +506,25 @@ t2i_pretrain_path:
     with open(config_path, 'w', encoding='utf-8') as f:
         f.write(config_content)
     
-    print(f"创建 dataset_config.yaml: {config_path}")
+    print(f"Created dataset_config.yaml: {config_path}")
     return config_path
 
 
 def create_run_scripts(exp_name: str, exp_config: dict, global_config: dict, exp_dir: Path) -> None:
-    """创建run.sh脚本"""
-    
-    # 使用相对路径
+    """Create run.sh script."""
+
+    # Use relative paths
     model_path = str(CKPTS_DIR / "BAGEL-7B-MoT")
     llm_path = str(CKPTS_DIR / "Qwen2.5-7B-Instruct")
     
-    # 获取训练参数
+    # Get training parameters
     learning_rate = exp_config.get('learning_rate', global_config.get('default_learning_rate', 2e-5))
     num_workers = exp_config.get('num_workers', global_config.get('default_num_workers', 1))
-    
-    # 创建 run.sh
+
+    # Create run.sh
     run_content = f'''#!/bin/bash
-# Bagel训练脚本 - 实验名称: {exp_name}
-# 由 process_config.py 自动生成
+# Bagel training script - experiment name: {exp_name}
+# Auto-generated by process_config.py
 
 set -e
 
@@ -538,14 +538,14 @@ cd {SOURCE_DIR}
 export PYTHONPATH={SOURCE_DIR}:$PYTHONPATH
 export WANDB_DIR="${{SCRIPT_DIR}}/wandb"
 
-# 模型路径（使用相对路径）
+# Model paths (using relative paths)
 MODEL_PATH="{model_path}"
 LLM_PATH="{llm_path}"
 DATASET_CONFIG="${{SCRIPT_DIR}}/dataset_config.yaml"
 RESULTS_DIR="${{SCRIPT_DIR}}/results"
 CHECKPOINT_DIR="${{RESULTS_DIR}}/checkpoints"
 
-# 训练参数配置
+# Training parameters
 RESUME_FROM="${{MODEL_PATH}}"
 SHARDING_STRATEGY="FULL_SHARD"
 LR={learning_rate}
@@ -556,7 +556,7 @@ EXPECTED_NUM_TOKENS=32768
 MAX_NUM_TOKENS=36864
 MAX_NUM_TOKENS_PER_SAMPLE=32768
 
-# 解析集群信息并设置环境变量 (如果存在)
+# Parse cluster info and set environment variables (if available)
 if [ -n "$AFO_ENV_CLUSTER_SPEC" ]; then
     cluster_spec=${{AFO_ENV_CLUSTER_SPEC}}
     role=$(jq -r .role <<< "$cluster_spec")
@@ -571,7 +571,7 @@ if [ -n "$AFO_ENV_CLUSTER_SPEC" ]; then
     IFS="," read -ra master_ports <<< "$ports"
     master_port=${{master_ports[0]}}
 else
-    # 本地运行默认值
+    # Default values for local execution
     node_rank=0
     nnodes=1
     nproc_per_node=$(nvidia-smi --list-gpus 2>/dev/null | wc -l | tr -d ' ' || echo "1")
@@ -580,20 +580,20 @@ else
 fi
 
 echo "========================================"
-echo "Bagel 训练 - {exp_name}"
+echo "Bagel Training - {exp_name}"
 echo "========================================"
-echo "模型路径: $MODEL_PATH"
-echo "LLM路径: $LLM_PATH"
-echo "数据配置: $DATASET_CONFIG"
-echo "输出目录: $RESULTS_DIR"
-echo "节点数: $nnodes, 每节点GPU数: $nproc_per_node"
+echo "Model path: $MODEL_PATH"
+echo "LLM path: $LLM_PATH"
+echo "Dataset config: $DATASET_CONFIG"
+echo "Output dir: $RESULTS_DIR"
+echo "Nodes: $nnodes, GPUs per node: $nproc_per_node"
 echo "========================================"
 
 mkdir -p "$RESULTS_DIR"
 mkdir -p "$WANDB_DIR"
 mkdir -p "$CHECKPOINT_DIR"
 
-# 运行训练
+# Run training
 torchrun \\
   --nnodes=$nnodes \\
   --node_rank=$node_rank \\
@@ -629,8 +629,8 @@ torchrun \\
   --checkpoint_dir ${{CHECKPOINT_DIR}}
 
 echo "========================================"
-echo "训练完成!"
-echo "输出目录: $RESULTS_DIR"
+echo "Training complete!"
+echo "Output dir: $RESULTS_DIR"
 echo "========================================"
 '''
     
@@ -638,49 +638,49 @@ echo "========================================"
     with open(run_sh_path, 'w', encoding='utf-8') as f:
         f.write(run_content)
     run_sh_path.chmod(0o755)
-    print(f"创建 run.sh: {run_sh_path}")
+    print(f"Created run.sh: {run_sh_path}")
 
 
 def process_experiment(exp_name: str, remake_data: bool = False) -> None:
-    """处理单个实验配置"""
+    """Process a single experiment configuration."""
     config = load_config()
     global_config = config.get('global', {})
     experiments = config.get('experiments', {})
-    
+
     if exp_name not in experiments:
-        print(f"错误: 实验 '{exp_name}' 不存在于配置文件中")
-        print(f"可用实验: {list(experiments.keys())}")
+        print(f"Error: experiment '{exp_name}' not found in config file")
+        print(f"Available experiments: {list(experiments.keys())}")
         sys.exit(1)
-    
+
     exp_config = experiments[exp_name]
     use_t2i = exp_config.get('use_t2i', False)
-    
+
     print(f"\n{'='*60}")
-    print(f"处理实验: {exp_name}")
-    print(f"使用T2I: {use_t2i}")
-    print(f"重新转换数据: {remake_data}")
+    print(f"Processing experiment: {exp_name}")
+    print(f"Use T2I: {use_t2i}")
+    print(f"Re-convert data: {remake_data}")
     print(f"{'='*60}")
-    
-    # 设置实验目录
+
+    # Set experiment directory
     exp_dir = EXPS_DIR / exp_name
     exp_dir.mkdir(parents=True, exist_ok=True)
     
     parquet_dir = exp_dir / 'parquet'
     parquet_dir.mkdir(parents=True, exist_ok=True)
     
-    # 准备T2I数据
+    # Prepare T2I data
     t2i_data_dir = None
     if use_t2i:
         t2i_jsonl_path = global_config.get('t2i_data_path', '')
         if t2i_jsonl_path:
             t2i_output_dir = exp_dir / "t2i_parquet"
             if not remake_data and check_t2i_data_prepared(t2i_output_dir):
-                print(f"T2I数据已存在，跳过准备: {t2i_output_dir}")
+                print(f"T2I data already exists, skipping preparation: {t2i_output_dir}")
                 t2i_data_dir = t2i_output_dir
             else:
                 t2i_data_dir, _, _ = prepare_t2i_data(t2i_jsonl_path, t2i_output_dir)
     
-    # 准备MultiRef数据
+    # Prepare MultiRef data
     multiref_data_root = Path(global_config.get('multiref_data_root', ''))
     if not multiref_data_root.is_absolute():
         multiref_data_root = MACRO_DIR / multiref_data_root
@@ -690,22 +690,22 @@ def process_experiment(exp_name: str, remake_data: bool = False) -> None:
     multi_ref_data_dirs = []
     multiref_statistics = []
     if data_config:
-        print("\n准备MultiRef数据...")
+        print("\nPreparing MultiRef data...")
         multi_ref_data_dirs, multiref_statistics = prepare_multiref_data(
             multiref_data_root, data_config, parquet_dir,
             force_regenerate=remake_data
         )
     
-    # 创建dataset_config.yaml
+    # Create dataset_config.yaml
     create_dataset_config_yaml(
         exp_name, exp_config, global_config,
         exp_dir, t2i_data_dir, multi_ref_data_dirs
     )
     
-    # 创建运行脚本
+    # Create run scripts
     create_run_scripts(exp_name, exp_config, global_config, exp_dir)
     
-    # 保存实验摘要
+    # Save experiment summary
     summary = {
         'exp_name': exp_name,
         'config': exp_config,
@@ -719,45 +719,45 @@ def process_experiment(exp_name: str, remake_data: bool = False) -> None:
     with open(exp_dir / 'experiment_summary.json', 'w', encoding='utf-8') as f:
         json.dump(summary, f, indent=2, ensure_ascii=False)
     
-    print(f"\n实验 '{exp_name}' 处理完成!")
-    print(f"  数据目录: {exp_dir}")
-    print(f"  训练脚本: {exp_dir / 'run.sh'}")
-    print(f"  启动训练: bash {exp_dir / 'run.sh'}")
+    print(f"\nExperiment '{exp_name}' processing complete!")
+    print(f"  Data directory: {exp_dir}")
+    print(f"  Training script: {exp_dir / 'run.sh'}")
+    print(f"  Start training: bash {exp_dir / 'run.sh'}")
 
 
 def list_experiments() -> None:
-    """列出所有可用实验"""
+    """List all available experiments."""
     config = load_config()
     experiments = config.get('experiments', {})
-    
+
     print("\n" + "="*60)
-    print("可用实验列表")
+    print("Available experiments")
     print("="*60)
-    
+
     if not experiments:
-        print("  没有配置任何实验")
+        print("  No experiments configured")
         return
-    
+
     for name, exp in experiments.items():
         use_t2i = "T2I" if exp.get('use_t2i', False) else "No-T2I"
         tasks = list(exp.get('data_config', {}).keys())
         print(f"\n  {name}:")
         print(f"    T2I: {use_t2i}")
         if tasks:
-            print(f"    任务: {', '.join(tasks)}")
+            print(f"    Tasks: {', '.join(tasks)}")
     
     print("\n" + "="*60)
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Bagel 配置处理脚本",
+        description="Bagel configuration processing script",
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument('--exp_name', type=str, help='实验名称')
-    parser.add_argument('--list', action='store_true', help='列出所有可用实验')
-    parser.add_argument('--all', action='store_true', help='处理所有实验')
-    parser.add_argument('--remake', action='store_true', help='强制重新转换数据')
+    parser.add_argument('--exp_name', type=str, help='Experiment name')
+    parser.add_argument('--list', action='store_true', help='List all available experiments')
+    parser.add_argument('--all', action='store_true', help='Process all experiments')
+    parser.add_argument('--remake', action='store_true', help='Force re-convert data')
     
     args = parser.parse_args()
     

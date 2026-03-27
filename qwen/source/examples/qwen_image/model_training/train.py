@@ -136,13 +136,13 @@ if __name__ == "__main__":
         accelerator_kwargs["deepspeed_plugin"] = deepspeed_plugin
     
     accelerator = accelerate.Accelerator(**accelerator_kwargs)
-    # 处理 max_input_pixels：如果未设置，使用 max_pixels 作为默认值
+    # Handle max_input_pixels: if not set, use max_pixels as default
     max_input_pixels = args.max_input_pixels if args.max_input_pixels is not None else args.max_pixels
-    
-    # 构建 edit_image 处理器
-    # edit_image 使用 max_input_pixels（支持列表形式的动态像素限制）
+
+    # Build edit_image processor
+    # edit_image uses max_input_pixels (supports dynamic pixel limits in list form)
     if isinstance(max_input_pixels, list):
-        # 使用动态处理器，根据输入图像数量调整 max_pixels
+        # Use dynamic processor to adjust max_pixels based on number of input images
         edit_image_operator = ImageCropAndResizeDynamic(
             height=args.height, 
             width=args.width, 
@@ -154,7 +154,7 @@ if __name__ == "__main__":
             convert_RGBA=False,
         )
     else:
-        # 使用标准处理器
+        # Use standard processor
         edit_image_operator = ToAbsolutePath(args.dataset_base_path) >> LoadImage() >> ImageCropAndResize(args.height, args.width, max_input_pixels, 16, 16)
     
     dataset = UnifiedDataset(
@@ -164,7 +164,7 @@ if __name__ == "__main__":
         data_file_keys=args.data_file_keys.split(","),
         main_data_operator=UnifiedDataset.default_image_operator(
             base_path=args.dataset_base_path,
-            max_pixels=args.max_pixels,  # 输出图像使用 max_pixels
+            max_pixels=args.max_pixels,  # output image uses max_pixels
             height=args.height,
             width=args.width,
             height_division_factor=16,
@@ -177,10 +177,10 @@ if __name__ == "__main__":
                 (str, ToAbsolutePath(args.dataset_base_path) >> LoadImage() >> ImageCropAndResize(args.height, args.width, args.max_pixels, 16, 16)),
                 (list, SequencialProcess(ToAbsolutePath(args.dataset_base_path) >> LoadImage(convert_RGB=False, convert_RGBA=True) >> ImageCropAndResize(args.height, args.width, args.max_pixels, 16, 16))),
             ]),
-            # edit_image 使用 max_input_pixels（支持动态调整）
+            # edit_image uses max_input_pixels (supports dynamic adjustment)
             "edit_image": edit_image_operator,
         },
-        max_edit_images=args.max_edit_images,  # 限制 edit_image 数量
+        max_edit_images=args.max_edit_images,  # limit number of edit_images
     )
     model = QwenImageTrainingModule(
         model_paths=args.model_paths,

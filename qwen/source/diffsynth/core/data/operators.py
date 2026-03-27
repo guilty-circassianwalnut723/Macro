@@ -104,29 +104,29 @@ class ImageCropAndResize(DataProcessingOperator):
 
 class ImageCropAndResizeDynamic(DataProcessingOperator):
     """
-    支持动态 max_pixels 的图像处理器，用于处理输入图像（edit_image）。
-    
-    类似 OmniGen 的 max_input_pixels 逻辑：
-    - 如果 max_pixels 是 list，根据输入图像数量选择对应索引的像素限制
-    - 如果 max_pixels 是 int，所有图像使用相同的限制
-    
-    该处理器直接处理图像路径列表，能感知列表长度来确定动态 max_pixels。
+    Image processor with support for dynamic max_pixels, used to process input images (edit_image).
+
+    Similar to OmniGen's max_input_pixels logic:
+    - If max_pixels is a list, select the pixel limit at the corresponding index based on the number of input images
+    - If max_pixels is an int, all images use the same limit
+
+    This processor directly handles lists of image paths and is aware of list length to determine dynamic max_pixels.
     """
-    def __init__(self, height=None, width=None, max_pixels=None, height_division_factor=1, width_division_factor=1, 
+    def __init__(self, height=None, width=None, max_pixels=None, height_division_factor=1, width_division_factor=1,
                  base_path="", convert_RGB=True, convert_RGBA=False, debug=False):
         self.height = height
         self.width = width
-        self.max_pixels = max_pixels  # 可以是 int 或 list
+        self.max_pixels = max_pixels  # can be int or list
         self.height_division_factor = height_division_factor
         self.width_division_factor = width_division_factor
         self.base_path = base_path
         self.convert_RGB = convert_RGB
         self.convert_RGBA = convert_RGBA
         self.debug = debug
-        self._debug_count = 0  # 用于控制调试输出频率
+        self._debug_count = 0  # used to control debug output frequency
 
     def _get_max_pixels_for_img_num(self, img_num):
-        """根据图像数量获取单张图片的 max_pixels 限制"""
+        """Get max_pixels limit for a single image based on the number of images"""
         if isinstance(self.max_pixels, (list, tuple)):
             idx = min(img_num - 1, len(self.max_pixels) - 1)
             idx = max(0, idx)
@@ -143,7 +143,7 @@ class ImageCropAndResizeDynamic(DataProcessingOperator):
         )
         image = torchvision.transforms.functional.center_crop(image, (target_height, target_width))
         return image
-    
+
     def get_height_width(self, image, max_pixels):
         if self.height is None or self.width is None:
             width, height = image.size
@@ -155,49 +155,49 @@ class ImageCropAndResizeDynamic(DataProcessingOperator):
         else:
             height, width = self.height, self.width
         return height, width
-    
+
     def process_single_image(self, image_path, max_pixels, img_idx=0, total_imgs=1):
-        """处理单张图像"""
-        # 转换为绝对路径
+        """Process a single image"""
+        # Convert to absolute path
         if self.base_path:
             full_path = os.path.join(self.base_path, image_path)
         else:
             full_path = image_path
-        
-        # 加载图像
+
+        # Load image
         image = Image.open(full_path)
         original_size = image.size  # (width, height)
         if self.convert_RGB:
             image = image.convert("RGB")
         if self.convert_RGBA:
             image = image.convert("RGBA")
-        
-        # 裁剪和缩放
+
+        # Crop and resize
         target_height, target_width = self.get_height_width(image, max_pixels)
         image = self.crop_and_resize(image, target_height, target_width)
-        
+
         return image
-    
+
     def __call__(self, data):
         """
-        处理图像路径或路径列表。
-        
+        Process image path or list of paths.
+
         Args:
-            data: 可以是字符串（单张图像路径）或字符串列表（多张图像路径）
-        
+            data: can be a string (single image path) or a list of strings (multiple image paths)
+
         Returns:
-            处理后的图像或图像列表
+            processed image or list of images
         """
         if isinstance(data, str):
-            # 单张图像
+            # Single image
             max_pixels = self._get_max_pixels_for_img_num(1)
             result = self.process_single_image(data, max_pixels, img_idx=0, total_imgs=1)
             return result
         elif isinstance(data, (list, tuple)):
-            # 多张图像：根据列表长度确定 max_pixels
+            # Multiple images: determine max_pixels based on list length
             img_num = len(data)
             max_pixels = self._get_max_pixels_for_img_num(img_num)
-            results = [self.process_single_image(img_path, max_pixels, img_idx=i, total_imgs=img_num) 
+            results = [self.process_single_image(img_path, max_pixels, img_idx=i, total_imgs=img_num)
                       for i, img_path in enumerate(data)]
             return results
         else:

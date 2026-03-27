@@ -73,7 +73,7 @@ def example(pipe, seeds, example_id, global_prompt, entity_prompts, height=784, 
         Image.open(f"./data/examples/eligen/poster/example_{example_id}/{i}.png").convert('RGB').resize((width, height))
         for i in range(len(entity_prompts))
     ]
-    negative_prompt = "网格化，规则的网格，模糊, 低分辨率, 低质量, 变形, 畸形, 错误的解剖学, 变形的手, 变形的身体, 变形的脸, 变形的头发, 变形的眼睛, 变形的嘴巴"
+    negative_prompt = "grid pattern, regular grid, blurry, low resolution, low quality, deformed, distorted, incorrect anatomy, deformed hands, deformed body, deformed face, deformed hair, deformed eyes, deformed mouth"
     for seed in seeds:
         # generate image
         image = pipe(
@@ -119,7 +119,7 @@ snapshot_download(
     allow_file_pattern="model.safetensors",
 )
 pipe.load_lora(pipe.dit, "models/DiffSynth-Studio/Qwen-Image-EliGen-Poster/model.safetensors", hotload=True)
-global_prompt = "一张以柔粉紫为背景的海报，左侧有大号粉紫色文字“Qwen-Image EliGen-Poster”，粉紫色椭圆框内白色小字：“图像精确分区控制模型”。右侧有一只小兔子在拆礼物，旁边站着一只头顶迷你烟花发射器的小龙（卡通Q版）。背景有一些白云点缀。整体风格卡通可爱，传达节日惊喜的主题。"
-entity_prompts = ["粉紫色文字“Qwen-Image EliGen-Poster”", "粉紫色椭圆框内白色小字：“图像精确分区控制模型”", "一只小兔子在拆礼物，小兔子旁边站着一只头顶迷你烟花发射器的小龙（卡通Q版）"]
+global_prompt = "A poster with a soft pink-purple background, on the left side large pink-purple text 'Qwen-Image EliGen-Poster', inside a pink-purple oval frame small white text: 'Image Precise Zone Control Model'. On the right side, a small rabbit unwrapping a gift, next to it stands a small dragon (cartoon chibi style) with a mini firework launcher on its head. Some white clouds in the background. Overall style is cartoon-cute, conveying a theme of holiday surprise."
+entity_prompts = ["pink-purple text 'Qwen-Image EliGen-Poster'", "small white text inside pink-purple oval: 'Image Precise Zone Control Model'", "a small rabbit unwrapping a gift, next to a small dragon (cartoon chibi style) with a mini firework launcher on its head"]
 seed = [42]
 example(pipe, seed, 1, global_prompt, entity_prompts)

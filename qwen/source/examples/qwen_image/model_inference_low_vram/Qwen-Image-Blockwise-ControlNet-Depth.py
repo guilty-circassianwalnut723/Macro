@@ -35,7 +35,7 @@ dataset_snapshot_download(
 
 controlnet_image = Image.open("data/example_image_dataset/depth/image_1.jpg").resize((1328, 1328))
 
-prompt = "精致肖像，水下少女，蓝裙飘逸，发丝轻扬，光影透澈，气泡环绕，面容恬静，细节精致，梦幻唯美。"
+prompt = "Exquisite portrait, underwater girl, blue dress flowing, hair gently swaying, light and shadow translucent, bubbles surrounding, serene expression, intricate details, dreamy and beautiful."
 image = pipe(
     prompt, seed=0,
     blockwise_controlnet_inputs=[ControlNetInput(image=controlnet_image)]

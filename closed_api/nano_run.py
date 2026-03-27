@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-使用 Nano API 生成图像。
-支持 ours 任务（customization/illustration/spatial/temporal）和 omni（omnicontext）。
-通过顶部 CONFIG 配置要跑的任务与 image_num_category。
+Generate images using the Nano API.
+Supports our tasks (customization/illustration/spatial/temporal) and omni (omnicontext).
+Configure the tasks and image_num_category to run via the CONFIG block at the top.
 """
 
 import os
@@ -12,23 +12,23 @@ from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from PIL import Image
 
-# ============== 在此配置 ==============
+# ============== Configure here ==============
 CONFIG = {
-    # ours 任务：key 为任务名，value 为该任务要跑的 image_num_category 列表；
-    # 用 "all" 表示该任务下所有 category，空列表 [] 表示不跑该任务
+    # Our tasks: key is the task name, value is the list of image_num_category to run;
+    # use "all" to run all categories for that task, empty list [] to skip the task
     "ours": {
         "customization": ["1-3", "4-5", "6-7", ">=8"],
         "illustration": ["1-3", "4-5", "6-7", ">=8"],
         "spatial": ["1-3", "4-5", "6-7", ">=8"],
         "temporal": ["1-3", "4-5", "6-7", ">=8"],
     },
-    # 是否生成 omnicontext（omni）
+    # Whether to generate omnicontext (omni)
     "omni": True,
-    # 输出根目录
+    # Output root directory
     "output_root": "./outputs/api/nano",
-    # 并行 worker 数（同时发起的 API 请求数）
+    # Number of parallel workers (concurrent API requests)
     "num_workers": 16,
-    # API 参数（按需修改）
+    # API parameters (modify as needed)
     "api_key": os.environ.get("NANO_API_KEY", ""),
     "model_name": "gemini-3-pro-image-preview",
     "timeout": 60,
@@ -55,7 +55,7 @@ from common_utils import (
 
 
 def load_images_for_sample(sample: Dict[str, Any]) -> List[Image.Image]:
-    """将 sample['input_images']（路径或 PIL）转为 PIL 列表。"""
+    """Convert sample['input_images'] (paths or PIL) to a list of PIL Images."""
     images = []
     for item in sample.get("input_images", []):
         if isinstance(item, (str, Path)):
@@ -73,7 +73,7 @@ def process_one_sample(
     output_dir: Path,
     task: str,
 ) -> bool:
-    """处理单条样本，返回 True 表示成功或已跳过，False 表示失败。"""
+    """Process a single sample. Returns True on success or skip, False on failure."""
     idx = sample.get("idx", 0)
     if check_sample_exists(output_dir, idx):
         return True
@@ -95,7 +95,7 @@ def process_one_sample(
         )
         return True
     except Exception as e:
-        print(f"[nano] idx={idx} 失败: {e}")
+        print(f"[nano] idx={idx} failed: {e}")
         return False
 
 
@@ -107,7 +107,7 @@ def run_task(
     macro_dir: Path,
     num_workers: int,
 ) -> int:
-    """跑单个 task + category（并行），返回失败数。"""
+    """Run a single task + category (parallel). Returns the number of failures."""
     samples = load_data_for_task(
         task=task,
         image_num_category=image_num_category,
@@ -148,7 +148,7 @@ def main():
 
     total_failed = 0
 
-    # ours 任务
+    # Our tasks
     ours = cfg.get("ours", {})
     for task in SUPPORTED_TASKS:
         if task not in ours:
@@ -174,7 +174,7 @@ def main():
 
     if total_failed > 0:
         sys.exit(1)
-    print("nano_run 全部完成")
+    print("nano_run all done")
     sys.exit(0)
 
 

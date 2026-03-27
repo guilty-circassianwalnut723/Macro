@@ -64,7 +64,7 @@ def visualize_masks(image, masks, mask_prompts, output_path, font_size=35, use_r
 def example(pipe, seeds, example_id, global_prompt, entity_prompts):
     dataset_snapshot_download(dataset_id="DiffSynth-Studio/examples_in_diffsynth", local_dir="./", allow_file_pattern=f"data/examples/eligen/qwen-image/example_{example_id}/*.png")
     masks = [Image.open(f"./data/examples/eligen/qwen-image/example_{example_id}/{i}.png").convert('RGB').resize((1024, 1024)) for i in range(len(entity_prompts))]
-    negative_prompt = "网格化，规则的网格，模糊, 低分辨率, 低质量, 变形, 畸形, 错误的解剖学, 变形的手, 变形的身体, 变形的脸, 变形的头发, 变形的眼睛, 变形的嘴巴"
+    negative_prompt = "grid pattern, regular grid, blurry, low resolution, low quality, deformed, distorted, incorrect anatomy, deformed hands, deformed body, deformed face, deformed hair, deformed eyes, deformed mouth"
     for seed in seeds:
         # generate image
         image = pipe(
@@ -108,10 +108,10 @@ pipe.load_lora(pipe.dit, "models/DiffSynth-Studio/Qwen-Image-EliGen-V2/model.saf
 
 seeds = [0]
 
-global_prompt = "写实摄影风格. A beautiful asia woman wearing white dress, she is holding a mirror with her right arm, with a beach background."
+global_prompt = "Realistic photography style. A beautiful asia woman wearing white dress, she is holding a mirror with her right arm, with a beach background."
 entity_prompts = ["A beautiful woman", "mirror", "necklace", "glasses", "earring", "white dress", "jewelry headpiece"]
 example(pipe, seeds, 7, global_prompt, entity_prompts)
 
-global_prompt = "写实摄影风格, 细节丰富。街头一位漂亮的女孩，穿着衬衫和短裤，手持写有“实体控制”的标牌，背景是繁忙的城市街道，阳光明媚，行人匆匆。"
-entity_prompts = ["一个漂亮的女孩", "标牌 '实体控制'", "短裤", "衬衫"]
+global_prompt = "Realistic photography style, rich in detail. A pretty girl on the street, wearing a shirt and shorts, holding a sign that reads 'entity control', with a bustling city street in the background, sunny, pedestrians passing by."
+entity_prompts = ["A pretty girl", "sign 'entity control'", "shorts", "shirt"]
 example(pipe, seeds, 4, global_prompt, entity_prompts)
