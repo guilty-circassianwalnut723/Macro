@@ -5,9 +5,11 @@
 # MACRO: Advancing Multi-Reference Image Generation with Structured Long-Context Data
 
 <p align="center">
-  <strong>Zhekai Chen<sup>1</sup>, Yuqing Wang<sup>1</sup>, Manyuan Zhang<sup>2</sup>, Xihui Liu<sup>*1</sup></strong>
+  <strong>Zhekai Chen<sup>1</sup>, Yuqing Wang<sup>1</sup>, Manyuan Zhang<sup>†2</sup>, Xihui Liu<sup>†1</sup></strong>
   <br>
   <sup>1</sup>HKU MMLab &nbsp;&nbsp; <sup>2</sup>Meituan
+  <br>
+  <sup>†</sup>Corresponding authors
 </p>
 
 <p align="center">
