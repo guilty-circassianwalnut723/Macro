@@ -15,9 +15,9 @@
   &nbsp;
   <a href="https://huggingface.co/datasets/Azily/Macro-Dataset"><img src="https://img.shields.io/badge/🤗%20Macro--Dataset-yellow"></a>
   &nbsp;
-  <a href="https://arxiv.org/abs/XXXX.XXXXX"><img src="https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg"></a>
+  <a href="https://arxiv.org/abs/2603.25319"><img src="https://img.shields.io/badge/arXiv-2603.25319-b31b1b.svg"></a>
   &nbsp;
-  <a href="https://huggingface.co/papers/XXXX.XXXXX"><img src="https://img.shields.io/badge/🤗%20Daily%20Paper-orange"></a>
+  <a href="https://huggingface.co/papers/2603.25319"><img src="https://img.shields.io/badge/🤗%20Daily%20Paper-orange"></a>
 </p>
 
 **Macro** is a multi-reference image generation dataset and benchmark. It covers four task categories — **Customization**, **Illustration**, **Spatial**, and **Temporal** — across four image-count brackets (1–3, 4–5, 6–7, ≥8 reference images). Alongside the dataset we provide fine-tuned checkpoints for three open-source models: **Bagel**, **OmniGen2**, and **Qwen-Image-Edit**.
@@ -555,11 +555,11 @@ We thank the authors and contributors of the following open-source projects that
 If you find this work useful, please cite:
 
 ```bibtex
-@article{chen2026macro,
+@article{chen2026macroadvancingmultireferenceimage,
   title     = {MACRO: Advancing Multi-Reference Image Generation with Structured Long-Context Data},
-  author    = {Chen, Zhekai and Wang, Yuqing and Zhang, Manyuan and Liu, Xihui},
-  journal   = {arXiv preprint arXiv:XXXX.XXXXX},
+  author    = {Zhekai Chen and Yuqing Wang and Manyuan Zhang and Xihui Liu},
+  journal   = {arXiv preprint arXiv:2603.25319},
   year      = {2026},
-  url       = {https://arxiv.org/abs/XXXX.XXXXX}
+  url       = {https://arxiv.org/abs/2603.25319},
 }
 ```
